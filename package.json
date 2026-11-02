@@ -1,0 +1,242 @@
+{
+  "name": "skymood-theme",
+  "displayName": "Skymood — Adaptive Day/Night Theme",
+  "description": "A living color theme that shifts with your day, plus playful touches: a glow when you are in the flow, a celebration when your errors hit zero, golden hour at sunset and the moon phase at night.",
+  "version": "1.0.0",
+  "publisher": "mvnandhakumar",
+  "author": {
+    "name": "Nandha Kumar"
+  },
+  "license": "MIT",
+  "icon": "images/icon.png",
+  "galleryBanner": {
+    "color": "#17141f",
+    "theme": "dark"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Nandha65/skymood-theme"
+  },
+  "bugs": {
+    "url": "https://github.com/Nandha65/skymood-theme/issues"
+  },
+  "homepage": "https://github.com/Nandha65/skymood-theme#readme",
+  "sponsor": {
+    "url": "https://github.com/sponsors/Nandha65"
+  },
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Themes",
+    "Other"
+  ],
+  "keywords": [
+    "theme",
+    "dark theme",
+    "adaptive",
+    "day night",
+    "skymoodn",
+    "blue light",
+    "night shift",
+    "sunset",
+    "auto theme",
+    "playful",
+    "flow state",
+    "moon phase",
+    "golden hour",
+    "fun"
+  ],
+  "main": "./extension.js",
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "contributes": {
+    "themes": [
+      {
+        "label": "Skymood Adaptive",
+        "uiTheme": "vs-dark",
+        "path": "./themes/skymood-adaptive.json"
+      },
+      {
+        "label": "Skymood Night",
+        "uiTheme": "vs-dark",
+        "path": "./themes/skymood-night.json"
+      },
+      {
+        "label": "Skymood Dawn",
+        "uiTheme": "vs-dark",
+        "path": "./themes/skymood-dawn.json"
+      },
+      {
+        "label": "Skymood Day",
+        "uiTheme": "vs-dark",
+        "path": "./themes/skymood-day.json"
+      },
+      {
+        "label": "Skymood Dusk",
+        "uiTheme": "vs-dark",
+        "path": "./themes/skymood-dusk.json"
+      }
+    ],
+    "commands": [
+      {
+        "command": "skymood.enable",
+        "title": "Turn On Adaptive Theme",
+        "category": "Skymood"
+      },
+      {
+        "command": "skymood.previewCycle",
+        "title": "Preview a Full Day",
+        "category": "Skymood"
+      },
+      {
+        "command": "skymood.pickPhase",
+        "title": "Pin a Phase / Follow the Sun",
+        "category": "Skymood"
+      },
+      {
+        "command": "skymood.setLocation",
+        "title": "Set Location for Sunrise & Sunset",
+        "category": "Skymood"
+      },
+      {
+        "command": "skymood.togglePlayful",
+        "title": "Toggle Playful Effects",
+        "category": "Skymood"
+      },
+      {
+        "command": "skymood.celebrate",
+        "title": "Celebrate!",
+        "category": "Skymood"
+      },
+      {
+        "command": "skymood.removeOverrides",
+        "title": "Remove Adaptive Overrides from Settings",
+        "category": "Skymood"
+      },
+      {
+        "command": "skymood.menu",
+        "title": "Open Menu",
+        "category": "Skymood"
+      }
+    ],
+    "configuration": {
+      "title": "Skymood",
+      "properties": {
+        "skymood.mode": {
+          "type": "string",
+          "enum": [
+            "clock",
+            "solar"
+          ],
+          "enumDescriptions": [
+            "Use the fixed sunrise and sunset times below.",
+            "Calculate real sunrise and sunset from your latitude and longitude (offline)."
+          ],
+          "default": "clock",
+          "description": "How Skymood decides when day and night begin."
+        },
+        "skymood.sunrise": {
+          "type": "string",
+          "default": "06:30",
+          "pattern": "^\\d{1,2}:\\d{2}$",
+          "description": "Sunrise time (HH:MM, 24h) used in clock mode."
+        },
+        "skymood.sunset": {
+          "type": "string",
+          "default": "18:30",
+          "pattern": "^\\d{1,2}:\\d{2}$",
+          "description": "Sunset time (HH:MM, 24h) used in clock mode."
+        },
+        "skymood.latitude": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "default": null,
+          "minimum": -90,
+          "maximum": 90,
+          "description": "Latitude for solar mode. Stays on your machine."
+        },
+        "skymood.longitude": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "default": null,
+          "minimum": -180,
+          "maximum": 180,
+          "description": "Longitude for solar mode. Stays on your machine."
+        },
+        "skymood.nightWarmth": {
+          "type": "number",
+          "default": 0.4,
+          "minimum": 0,
+          "maximum": 1,
+          "description": "How much blue light to remove at night (0 = none, 1 = strongest)."
+        },
+        "skymood.pinnedPhase": {
+          "type": "string",
+          "enum": [
+            "auto",
+            "night",
+            "dawn",
+            "day",
+            "dusk"
+          ],
+          "default": "auto",
+          "description": "Follow the sun automatically, or pin one phase."
+        },
+        "skymood.updateIntervalMinutes": {
+          "type": "number",
+          "default": 5,
+          "minimum": 1,
+          "maximum": 60,
+          "description": "How often the palette is refreshed."
+        },
+        "skymood.showStatusBar": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show the current phase in the status bar."
+        },
+        "skymood.playful.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Master switch for all playful effects."
+        },
+        "skymood.playful.flowGlow": {
+          "type": "boolean",
+          "default": true,
+          "description": "Accent colors glow brighter the longer you type without a break (5, 15 and 30 minutes)."
+        },
+        "skymood.playful.bugMood": {
+          "type": "boolean",
+          "default": true,
+          "description": "The editor and status bar tint subtly warmer as errors pile up."
+        },
+        "skymood.playful.celebrate": {
+          "type": "boolean",
+          "default": true,
+          "description": "A short celebration in the status bar when your error count drops to zero."
+        },
+        "skymood.playful.goldenHour": {
+          "type": "boolean",
+          "default": true,
+          "description": "A warm golden shimmer around sunrise and sunset."
+        },
+        "skymood.playful.moonPhase": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show tonight’s moon phase, with a silver moonlight accent on full-moon nights."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "build:themes": "node scripts/build-themes.js",
+    "vscode:prepublish": "node scripts/build-themes.js",
+    "package": "npx @vscode/vsce package",
+    "publish": "npx @vscode/vsce publish"
+  }
+}

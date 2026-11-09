@@ -1,0 +1,7 @@
+.github/**
+.vscode/**
+scripts/**
+images/day-cycle.gif
+images/playful.png
+.gitignore
+**/*.vsix

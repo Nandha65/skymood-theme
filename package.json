@@ -2,7 +2,7 @@
   "name": "skymood-theme",
   "displayName": "Skymood — Adaptive Day/Night Theme",
   "description": "A living color theme that shifts with your day, plus playful touches: a glow when you are in the flow, a celebration when your errors hit zero, golden hour at sunset and the moon phase at night.",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "publisher": "mvnandhakumar",
   "author": {
     "name": "Nandha Kumar"
@@ -36,7 +36,7 @@
     "dark theme",
     "adaptive",
     "day night",
-    "skymoodn",
+    "skymood",
     "blue light",
     "night shift",
     "sunset",
@@ -48,6 +48,10 @@
     "fun"
   ],
   "main": "./extension.js",
+  "extensionKind": [
+    "ui",
+    "workspace"
+  ],
   "activationEvents": [
     "onStartupFinished"
   ],
@@ -213,12 +217,12 @@
         "skymood.playful.bugMood": {
           "type": "boolean",
           "default": true,
-          "description": "The editor and status bar tint subtly warmer as errors pile up."
+          "description": "The editor and status bar tint subtly warmer as errors pile up in your open files."
         },
         "skymood.playful.celebrate": {
           "type": "boolean",
           "default": true,
-          "description": "A short celebration in the status bar when your error count drops to zero."
+          "description": "A short celebration in the status bar when you fix the last error in your open files."
         },
         "skymood.playful.goldenHour": {
           "type": "boolean",

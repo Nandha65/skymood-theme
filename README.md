@@ -29,8 +29,8 @@ It also notices you: it glows when you're in the flow and celebrates when your e
 ![Flow glow, bug mood, victory and golden hour](images/playful.png)
 
 - 🔥 **Flow glow.** Type steadily for 5, 15 or 30 minutes and the accents grow brighter. The status bar counts your streak. Take a break and it calms down.
-- 🐞 **Bug mood.** As errors pile up, the editor picks up a subtle warning tint. It's a nudge, never a distraction.
-- ✅ **Victory.** Fix your last error and the status bar does a quick celebration.
+- 🐞 **Bug mood.** As errors pile up in your open files, the editor picks up a subtle warning tint. It's a nudge, never a distraction.
+- ✅ **Victory.** Fix the last error in your open files and the status bar does a quick celebration.
 - ✨ **Golden hour.** A warm golden shimmer around sunrise and sunset.
 - 🌕 **Moon phase.** Tonight's moon in the status bar, and a silver moonlight accent on full-moon nights.
 
@@ -76,7 +76,13 @@ Prefer a fixed look? **Skymood Night**, **Dawn**, **Day** and **Dusk** are inclu
 
 ## 🔒 Privacy and how it works
 
-Everything runs locally: no network calls and no telemetry, and your location stays on your machine. Skymood writes its colors into `workbench.colorCustomizations` and `editor.tokenColorCustomizations`, **scoped to `[Skymood Adaptive]` only**, so your other themes and your own tweaks are untouched.
+Everything runs locally: no network calls and no telemetry, and your location stays on your machine. Skymood writes its colors into `workbench.colorCustomizations` and `editor.tokenColorCustomizations`, **scoped to `[Skymood Adaptive]` only**, so your other themes and your own tweaks are untouched. With several windows open, the one you're working in sets the colors.
+
+**Settings Sync on several machines?** Those two settings sync like any other, so machines in different timezones would keep repainting each other. To keep Skymood's colors per machine, add this to your user settings. Note that it also stops syncing any color customizations of your own.
+
+```json
+"settingsSync.ignoredSettings": ["workbench.colorCustomizations", "editor.tokenColorCustomizations"]
+```
 
 ## ❤️ Support
 

@@ -84,6 +84,10 @@ Everything runs locally: no network calls and no telemetry, and your location st
 "settingsSync.ignoredSettings": ["workbench.colorCustomizations", "editor.tokenColorCustomizations"]
 ```
 
+## 💬 Community
+
+Questions, ideas, or a screenshot of your setup at golden hour? Join the [Skymood Discord](https://discord.gg/2jrg7VyS3). Found a bug? [Open an issue](https://github.com/Nandha65/skymood-theme/issues).
+
 ## ❤️ Support
 
 If Skymood makes your late-night coding a little kinder on the eyes, [sponsor the project](https://github.com/sponsors/Nandha65) or leave a ⭐ on [GitHub](https://github.com/Nandha65/skymood-theme).

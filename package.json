@@ -2,7 +2,7 @@
   "name": "skymood-theme",
   "displayName": "Skymood — Adaptive Day/Night Theme",
   "description": "A living color theme that shifts with your day, plus playful touches: a glow when you are in the flow, a celebration when your errors hit zero, golden hour at sunset and the moon phase at night.",
-  "version": "1.0.1",
+  "version": "1.1.0",
   "publisher": "mvnandhakumar",
   "author": {
     "name": "Nandha Kumar"
@@ -222,7 +222,12 @@
         "skymood.playful.celebrate": {
           "type": "boolean",
           "default": true,
-          "description": "A short celebration in the status bar when you fix the last error in your open files."
+          "description": "Celebrate when you fix the last error in your open files. The more errors you fixed, the bigger the party."
+        },
+        "skymood.playful.confetti": {
+          "type": "boolean",
+          "default": true,
+          "description": "Confetti and a pop-up badge over the editor when you celebrate, and a badge at flow milestones. Skipped when workbench.reduceMotion is on (the status bar still cheers)."
         },
         "skymood.playful.goldenHour": {
           "type": "boolean",

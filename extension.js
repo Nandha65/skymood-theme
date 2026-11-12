@@ -2,6 +2,7 @@
 const vscode = require('vscode');
 const P = require('./src/palette');
 const FX = require('./src/effects');
+const Confetti = require('./src/confetti');
 const { sunTimes, parseClock, formatClock } = require('./src/sun');
 
 const THEME = 'Skymood Adaptive';
@@ -9,8 +10,10 @@ const KEY = `[${THEME}]`;
 const LABELS = { night: 'Night', dawn: 'Dawn', day: 'Day', dusk: 'Dusk' };
 const ICONS = { night: '$(star-empty)', dawn: '$(sparkle)', day: '$(lightbulb)', dusk: '$(flame)' };
 const IDLE_MS = 90 * 1000;
-const CHEER_CONFIRM_MS = 3000; // errors must stay at zero this long before celebrating
+const DIAG_DEBOUNCE_MS = 700; // diagnostics arrive in bursts; settle before counting
+const CHEER_CONFIRM_MS = 800; // errors must stay at zero this long before celebrating
 const CHEER_EDIT_WINDOW_MS = 60 * 1000; // and you must have edited recently
+const CHEER_MIN_ERROR_AGE_MS = 3000; // errors that blink while you type a line don't count
 const WATCHED_SETTINGS = [
   'skymood', 'workbench.colorTheme', 'workbench.preferredDarkColorTheme',
   'workbench.preferredLightColorTheme', 'window.autoDetectColorScheme'
@@ -200,6 +203,10 @@ function onEdit(e) {
 function checkFlow() {
   const level = FX.flowLevel(flowMinutes());
   if (level !== live.flowLevel) {
+    // Reaching a new flow milestone (5, 15, 30 min) gets a 🔥 badge (no confetti mid-typing).
+    if (level > live.flowLevel && fun('flowGlow') && fun('confetti') && vscode.window.state.focused) {
+      Confetti.play('flow', badgeFor(computeState(nowMinutes()).palette, `🔥  ${[0, 5, 15, 30][level]} minutes in the flow`, 'accent'));
+    }
     live.flowLevel = level;
     render();
   } else if (level > 0 && statusItem && !previewing && !celebrating) {
@@ -251,43 +258,58 @@ function onDiagnostics() {
       live.bugLevel = level;
       render();
     }
-    if (prev > 0 && count === 0 && fun('celebrate')) maybeCelebrate(prevFiles, open);
-  }, 1500);
+    if (prev > 0 && count === 0 && fun('celebrate')) maybeCelebrate(prev, prevFiles, open);
+  }, DIAG_DEBOUNCE_MS);
 }
 
 /**
  * Celebrates only a real fix. The count also drops to zero when you close the files that had
  * errors, or when a language server restarts and briefly clears its diagnostics.
  */
-function maybeCelebrate(prevFiles, open) {
+function maybeCelebrate(fixed, prevFiles, open) {
   const now = Date.now();
   const fileStillOpen = [...prevFiles].some(uri => open.has(uri));
   const editedRecently = now - live.lastEdit < CHEER_EDIT_WINDOW_MS;
-  const hadErrorsAWhile = now - live.errorsSince > 5000;
+  const hadErrorsAWhile = now - live.errorsSince > CHEER_MIN_ERROR_AGE_MS;
   if (!fileStillOpen || !editedRecently || !hadErrorsAWhile) return;
   clearTimeout(cheerHandle);
   cheerHandle = setTimeout(() => {
-    if (scanErrors().count === 0) celebrate();
+    if (scanErrors().count === 0) celebrate(FX.celebration(fixed));
   }, CHEER_CONFIRM_MS);
 }
 
-async function celebrate() {
+const PARTY = { kind: 'party', label: '🎉', text: '🎉' }; // the popper says it all
+
+/**
+ * Badge and confetti colours from the current palette, so a celebration at night is warm amber
+ * and rose, and one at noon is crisp blue and green.
+ */
+const badgeFor = (palette, label, tint = 'string') => ({
+  label,
+  color: palette[tint],
+  background: palette.bgAlt,
+  colors: ['accent', 'string', 'keyword', 'func', 'number', 'type', 'tag'].map(k => palette[k]),
+  columns: vscode.window.tabGroups.all.length // editors side by side, to find the centre of each
+});
+
+/**
+ * A badge with one emoji pops up over the editors saying what happened, confetti bursts out
+ * of it, and the status bar item cheers. Nothing is written to settings, so it starts instantly and ends cleanly.
+ * @param {{kind: string, label: string, text: string}} [moment] from FX.celebration(), or a party when run by hand
+ */
+async function celebrate(moment) {
   if (celebrating || previewing) return;
+  const { kind, label, text } = moment && moment.kind ? moment : PARTY; // the command passes no args
   celebrating = true;
   try {
     const info = computeState(nowMinutes());
-    if (canWrite()) {
-      for (const party of [1, 1, 0.75, 0.45, 0.2]) {
-        updateStatus(info, '$(pass-filled) All clear! $(sparkle)');
-        await applyColors(info.palette, { ...info.fx, celebrate: party });
-        await sleep(420);
-      }
-    } else {
-      updateStatus(info, '$(pass-filled) All clear! $(sparkle)');
-      await sleep(2000);
-    }
+    updateStatus(info, text);
+    if (statusItem) statusItem.color = info.palette.string;
+    if (fun('confetti')) Confetti.play(kind, badgeFor(info.palette, label));
+    await sleep(3200);
   } finally {
     celebrating = false;
+    if (statusItem) statusItem.color = undefined;
     await render();
   }
 }
@@ -443,7 +465,7 @@ function activate(context) {
     vscode.window.onDidChangeActiveColorTheme(() => render()),
     // Gaining focus makes this window the one that writes, so it puts its own colors back.
     vscode.window.onDidChangeWindowState(s => { if (s.focused) render(); }),
-    { dispose: () => { clearTimeout(loopHandle); clearInterval(flowHandle); clearTimeout(diagHandle); clearTimeout(cheerHandle); } }
+    { dispose: () => { clearTimeout(loopHandle); clearInterval(flowHandle); clearTimeout(diagHandle); clearTimeout(cheerHandle); Confetti.stop(); } }
   );
 
   flowHandle = setInterval(checkFlow, 15000);
@@ -465,6 +487,7 @@ function deactivate() {
   clearInterval(flowHandle);
   clearTimeout(diagHandle);
   clearTimeout(cheerHandle);
+  Confetti.stop();
 }
 
 module.exports = { activate, deactivate };

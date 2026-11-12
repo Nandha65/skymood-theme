@@ -28,9 +28,9 @@ It also notices you: it glows when you're in the flow and celebrates when your e
 
 ![Flow glow, bug mood, victory and golden hour](images/playful.png)
 
-- 🔥 **Flow glow.** Type steadily for 5, 15 or 30 minutes and the accents grow brighter. The status bar counts your streak. Take a break and it calms down.
+- 🔥 **Flow glow.** Type steadily for 5, 15 or 30 minutes and the accents grow brighter, with a 🔥 badge at each milestone. The status bar counts your streak. Take a break and it calms down.
 - 🐞 **Bug mood.** As errors pile up in your open files, the editor picks up a subtle warning tint. It's a nudge, never a distraction.
-- ✅ **Victory.** Fix the last error in your open files and the status bar does a quick celebration.
+- 🎉 **Victory.** Fix the last error in your open files and confetti bursts over your editor, in the colors of the current hour, around a badge saying how many you fixed. The more you fixed, the bigger the party: 👍 for one or two, 🙌 for a handful, 🏆 and a double burst for ten or more.
 - ✨ **Golden hour.** A warm golden shimmer around sunrise and sunset.
 - 🌕 **Moon phase.** Tonight's moon in the status bar, and a silver moonlight accent on full-moon nights.
 
@@ -66,7 +66,7 @@ Or just click the Skymood item in the status bar.
 | `skymood.nightWarmth` | `0.4` | Blue-light reduction at night (0–1) |
 | `skymood.pinnedPhase` | `auto` | `auto`, `night`, `dawn`, `day` or `dusk` |
 | `skymood.playful.enabled` | `true` | Master switch for playful effects |
-| `skymood.playful.flowGlow` / `bugMood` / `celebrate` / `goldenHour` / `moonPhase` | `true` | Each effect on its own |
+| `skymood.playful.flowGlow` / `bugMood` / `celebrate` / `confetti` / `goldenHour` / `moonPhase` | `true` | Each effect on its own |
 | `skymood.updateIntervalMinutes` | `5` | How often the colors refresh |
 | `skymood.showStatusBar` | `true` | Show the status bar item |
 

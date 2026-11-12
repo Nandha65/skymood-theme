@@ -72,10 +72,31 @@ function bugLevel(errors) {
   return 0;
 }
 
+/** One emoji per celebration, picked fresh each time so it doesn't get stale. */
+const CHEER_EMOJI = {
+  small: ['👍', '✅', '👌', '🙂', '✨'],
+  medium: ['🙌', '💪', '💯', '👏', '🤟'],
+  big: ['🏆', '🚀', '👑', '🥳', '🔥']
+};
+
+/**
+ * How big a celebration fixing `fixed` errors deserves: how much confetti, the badge shown
+ * over the editor, and the status bar message.
+ */
+function celebration(fixed, random = Math.random) {
+  const kind = fixed >= 10 ? 'big' : fixed >= 3 ? 'medium' : 'small';
+  const set = CHEER_EMOJI[kind];
+  const emoji = set[Math.floor(random() * set.length)];
+  const message = kind === 'big' ? `${fixed} errors squashed!`
+    : kind === 'medium' ? `${fixed} errors fixed!`
+      : fixed === 1 ? 'Error fixed. All clear!' : 'Both errors fixed. All clear!';
+  return { kind, emoji, label: `${emoji}  ${message}`, text: `$(pass-filled) ${message} ${emoji}` };
+}
+
 /**
  * @param {Record<string,string>} base workbench colors
  * @param {object} p blended palette
- * @param {{golden?:number, moonGlow?:number, flow?:number, bugs?:number, celebrate?:number}} fx
+ * @param {{golden?:number, moonGlow?:number, flow?:number, bugs?:number}} fx
  */
 function decorate(base, p, fx) {
   const c = { ...base };
@@ -83,7 +104,6 @@ function decorate(base, p, fx) {
   const moonGlow = fx.moonGlow || 0;
   const flow = (fx.flow || 0) / 3;
   const bugs = (fx.bugs || 0) / 3;
-  const party = fx.celebrate || 0;
 
   if (golden > 0) {
     shift(c, ACCENT_KEYS, GOLD, 0.75 * golden);
@@ -109,14 +129,7 @@ function decorate(base, p, fx) {
       c['statusBar.border'] = mix(p.border, p.accent, 0.6 * flow);
     }
   }
-  if (party > 0) {
-    c['statusBar.background'] = mix(p.bgDeep, p.string, 0.9 * party);
-    c['statusBar.foreground'] = party >= 0.4 ? p.bgDeep : p.fg;
-    c['statusBar.border'] = p.string;
-    shift(c, ['tab.activeBorderTop', 'editorCursor.foreground', 'activityBar.activeBorder', 'panelTitle.activeBorder'], p.string, party);
-    shift(c, ['editor.background'], p.string, 0.03 * party);
-  }
   return c;
 }
 
-module.exports = { moonInfo, goldenAmount, flowLevel, bugLevel, decorate };
+module.exports = { moonInfo, goldenAmount, flowLevel, bugLevel, celebration, CHEER_EMOJI, decorate };

@@ -88,6 +88,10 @@ Everything runs locally: no network calls and no telemetry, and your location st
 
 Questions, ideas, or a screenshot of your setup at golden hour? Join the [Skymood Discord](https://discord.gg/2jrg7VyS3). Found a bug? [Open an issue](https://github.com/Nandha65/skymood-theme/issues).
 
+## 🧰 Production starter kits
+
+Building a commercial product? **[Canvas Engine 2D](https://canvas-engine-2d.web.app)** is a TypeScript engine for interactive 2D configurators and floor planners: drag-and-drop layouts, live pricing and print-ready PDF export. [Try the live demo](https://canvas-engine-2d.web.app), then [get the source code](https://nandha4.gumroad.com/l/canvas-engine-2d) ($49 one-time) or [sponsor on GitHub](https://github.com/sponsors/Nandha65) ($29/month) for repo access and every update.
+
 ## ❤️ Support
 
 If Skymood makes your late-night coding a little kinder on the eyes, [sponsor the project](https://github.com/sponsors/Nandha65) or leave a ⭐ on [GitHub](https://github.com/Nandha65/skymood-theme).

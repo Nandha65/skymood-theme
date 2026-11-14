@@ -90,7 +90,7 @@ Questions, ideas, or a screenshot of your setup at golden hour? Join the [Skymoo
 
 ## 🧰 Production starter kits
 
-Building a commercial product? **[Canvas Engine 2D](https://canvas-engine-2d.web.app)** is a TypeScript engine for interactive 2D configurators and floor planners: drag-and-drop layouts, live pricing and print-ready PDF export. [Try the live demo](https://canvas-engine-2d.web.app), then [get the source code](https://nandha4.gumroad.com/l/canvas-engine-2d) ($49 one-time) or [sponsor on GitHub](https://github.com/sponsors/Nandha65) ($29/month) for repo access and every update.
+Building a commercial product? **[PlanForge](https://planforge.web.app)** is a TypeScript engine for spatial layout editors and interactive grid planners: drag-and-drop layouts, live pricing and print-ready PDF export. [Try the live demo](https://planforge.web.app), then [get the source code](https://nandha4.gumroad.com/l/planforge) ($49 one-time) or [sponsor on GitHub](https://github.com/sponsors/Nandha65) ($29/month) for repo access and every update.
 
 ## ❤️ Support
 

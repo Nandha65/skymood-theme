@@ -3,10 +3,12 @@ const vscode = require('vscode');
 const P = require('./src/palette');
 const FX = require('./src/effects');
 const Confetti = require('./src/confetti');
+const Pulse = require('./src/pulse');
 const { sunTimes, parseClock, formatClock } = require('./src/sun');
 
-const THEME = 'Skymood Adaptive';
-const KEY = `[${THEME}]`;
+/** The two adaptive themes. Each gets its own colors in settings, scoped to its name. */
+const THEMES = { dark: 'Skymood Adaptive', light: 'Skymood Adaptive Light' };
+const keyFor = variant => `[${THEMES[variant]}]`;
 const LABELS = { night: 'Night', dawn: 'Dawn', day: 'Day', dusk: 'Dusk' };
 const ICONS = { night: '$(star-empty)', dawn: '$(sparkle)', day: '$(lightbulb)', dusk: '$(flame)' };
 const IDLE_MS = 90 * 1000;
@@ -14,6 +16,9 @@ const DIAG_DEBOUNCE_MS = 700; // diagnostics arrive in bursts; settle before cou
 const CHEER_CONFIRM_MS = 800; // errors must stay at zero this long before celebrating
 const CHEER_EDIT_WINDOW_MS = 60 * 1000; // and you must have edited recently
 const CHEER_MIN_ERROR_AGE_MS = 3000; // errors that blink while you type a line don't count
+const PULSE_SETTLE_MS = 3000; // new errors must last this long before the editor pulses red
+const PULSE_EDIT_WINDOW_MS = 15 * 1000; // and come from your typing, not from opening a file
+const PULSE_COOLDOWN_MS = 30 * 1000; // at most one pulse this often
 const WATCHED_SETTINGS = [
   'skymood', 'workbench.colorTheme', 'workbench.preferredDarkColorTheme',
   'workbench.preferredLightColorTheme', 'window.autoDetectColorScheme'
@@ -23,6 +28,7 @@ let loopHandle;
 let flowHandle;
 let diagHandle;
 let cheerHandle;
+let pulseHandle;
 let statusItem;
 let previewing = false;
 let celebrating = false;
@@ -31,7 +37,8 @@ let writeChain = Promise.resolve();
 // Live playful state
 const live = {
   flowStart: 0, lastEdit: 0, flowLevel: 0,
-  errors: 0, errorFiles: new Set(), bugLevel: 0, errorsSince: 0
+  errors: 0, errorFiles: new Set(), bugLevel: 0, errorsSince: 0,
+  pulsedErrors: 0, lastPulse: 0 // error count the last pulse covered, and when it played
 };
 
 const cfg = () => vscode.workspace.getConfiguration('skymood');
@@ -42,18 +49,22 @@ const sameJson = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 const followsOsScheme = () => vscode.workspace.getConfiguration('window').get('autoDetectColorScheme', false);
 
 /**
- * True when Skymood Adaptive is the theme on screen. With window.autoDetectColorScheme on,
- * VS Code shows workbench.preferredDark/LightColorTheme and ignores workbench.colorTheme.
+ * Which adaptive theme is on screen: 'dark', 'light', or null for neither. With
+ * window.autoDetectColorScheme on, VS Code shows workbench.preferredDark/LightColorTheme and
+ * ignores workbench.colorTheme.
  */
-function themeActive() {
-  // Skymood Adaptive is a dark theme, so a light or high-contrast theme on screen is not it.
-  if (vscode.window.activeColorTheme.kind !== vscode.ColorThemeKind.Dark) return false;
+function activeVariant() {
+  const kind = vscode.window.activeColorTheme.kind;
+  const variant = kind === vscode.ColorThemeKind.Dark ? 'dark' : kind === vscode.ColorThemeKind.Light ? 'light' : null;
+  if (!variant) return null; // high contrast is never Skymood
+  const name = THEMES[variant];
   const wb = vscode.workspace.getConfiguration('workbench');
   if (followsOsScheme()) {
-    return wb.get('preferredDarkColorTheme') === THEME || wb.get('preferredLightColorTheme') === THEME;
+    return wb.get('preferredDarkColorTheme') === name || wb.get('preferredLightColorTheme') === name ? variant : null;
   }
-  return wb.get('colorTheme') === THEME;
+  return wb.get('colorTheme') === name ? variant : null;
 }
+const themeActive = () => activeVariant() !== null;
 
 /**
  * The colors live in user settings, which every window shares, but flow and error state are
@@ -61,16 +72,107 @@ function themeActive() {
  */
 const canWrite = () => vscode.window.state.focused && themeActive();
 
-/** Makes Skymood Adaptive the active theme, through whichever setting VS Code is using. */
+const MODES = ['dark', 'light', 'system'];
+const MODE_LABELS = { dark: 'Dark', light: 'Light', system: 'System default' };
+let applying = false; // true while Skymood itself is switching themes, so it doesn't sync mid-way
+
+/**
+ * The mode chosen in skymood.appearance: 'dark', 'light' or 'system' (follow the OS). Left
+ * unset, it's dark, unless VS Code already follows the OS appearance, then it's system, so
+ * turning Skymood on doesn't undo that.
+ */
+function appearance() {
+  const i = cfg().inspect('appearance') || {};
+  const set = i.workspaceFolderValue ?? i.workspaceValue ?? i.globalValue;
+  if (MODES.includes(set)) return set;
+  return followsOsScheme() ? 'system' : 'dark';
+}
+
+/** The theme variant to use when Skymood isn't on screen yet (system: whatever the OS shows). */
+function preferredVariant() {
+  const mode = appearance();
+  if (mode !== 'system') return mode;
+  const kind = vscode.window.activeColorTheme.kind;
+  return kind === vscode.ColorThemeKind.Light || kind === vscode.ColorThemeKind.HighContrastLight ? 'light' : 'dark';
+}
+
+/** True when Skymood is the selected theme, even if the OS is showing the other one right now. */
+function skymoodSelected() {
+  const wb = vscode.workspace.getConfiguration('workbench');
+  const names = Object.values(THEMES);
+  if (followsOsScheme()) return names.includes(wb.get('preferredDarkColorTheme')) || names.includes(wb.get('preferredLightColorTheme'));
+  return names.includes(wb.get('colorTheme'));
+}
+
+/**
+ * Makes Skymood the active theme in the mode from skymood.appearance.
+ *  - dark / light: sets that theme, and turns off window.autoDetectColorScheme if it was on,
+ *    since the OS would otherwise keep choosing.
+ *  - system: Skymood Adaptive for dark, Skymood Adaptive Light for light, and turns on
+ *    window.autoDetectColorScheme so VS Code follows the OS.
+ * The theme is written before the OS switch flips, so the screen goes straight to the right one.
+ */
 async function selectTheme() {
-  const followsOs = followsOsScheme();
-  await vscode.workspace.getConfiguration('workbench')
-    .update(followsOs ? 'preferredDarkColorTheme' : 'colorTheme', THEME, vscode.ConfigurationTarget.Global);
-  if (followsOs && vscode.window.activeColorTheme.kind !== vscode.ColorThemeKind.Dark) {
-    vscode.window.showInformationMessage(
-      'Skymood: set as your dark theme. VS Code follows your OS appearance (window.autoDetectColorScheme), so Skymood shows up when your OS is in dark mode.'
-    );
+  const wb = vscode.workspace.getConfiguration('workbench');
+  const win = vscode.workspace.getConfiguration('window');
+  const G = vscode.ConfigurationTarget.Global;
+  const mode = appearance();
+  applying = true;
+  try {
+    if (mode === 'system') {
+      await wb.update('preferredDarkColorTheme', THEMES.dark, G);
+      await wb.update('preferredLightColorTheme', THEMES.light, G);
+      if (!followsOsScheme()) await win.update('autoDetectColorScheme', true, G);
+    } else {
+      await wb.update('colorTheme', THEMES[mode], G);
+      if (followsOsScheme()) await win.update('autoDetectColorScheme', false, G);
+    }
+    await sleep(400); // let the theme change land before syncing again
+  } finally {
+    applying = false;
   }
+}
+
+/** skymood.appearance changed: switch modes, if Skymood is the theme in use. */
+async function applyAppearance() {
+  if (applying || !skymoodSelected()) return;
+  await selectTheme();
+  await render();
+}
+
+/**
+ * Keeps skymood.appearance saying what's on screen when the theme is changed outside Skymood:
+ * picking the other Skymood theme in VS Code's theme picker, or switching
+ * window.autoDetectColorScheme on or off by hand.
+ */
+function syncAppearance() {
+  if (applying) return;
+  const variant = activeVariant();
+  if (!variant) return;
+  const mode = followsOsScheme() ? 'system' : variant;
+  if (mode !== appearance()) cfg().update('appearance', mode, vscode.ConfigurationTarget.Global);
+}
+
+/** Menu: pick dark, light or system default. Turns Skymood on if another theme is showing. */
+async function pickAppearance() {
+  const current = appearance();
+  const items = [
+    { label: '$(color-mode) Dark', description: 'Skymood Adaptive', value: 'dark' },
+    { label: '$(sun) Light', description: 'Skymood Adaptive Light', value: 'light' },
+    { label: '$(device-desktop) System default', description: 'Dark or light, following your OS', value: 'system' }
+  ].map(i => ({ ...i, detail: i.value === current ? 'Current' : undefined }));
+  const choice = await vscode.window.showQuickPick(items, { placeHolder: 'Skymood: appearance' });
+  if (!choice) return;
+  const wasSelected = skymoodSelected();
+  if (choice.value !== current) {
+    applying = true; // switch once, below, rather than also from the settings listener
+    try {
+      await cfg().update('appearance', choice.value, vscode.ConfigurationTarget.Global);
+    } finally {
+      applying = false;
+    }
+  }
+  if (choice.value !== current || !wasSelected) await enable();
 }
 
 /** Sunrise/sunset for today, from location (solar mode) or fixed clock times. */
@@ -87,7 +189,7 @@ function getSunTimes() {
 }
 
 /** Full visual state for a minute of the day: phase blend + playful effects. */
-function computeState(minute, { forPreview = false } = {}) {
+function computeState(minute, { forPreview = false, variant = activeVariant() || preferredVariant() } = {}) {
   const c = cfg();
   const sun = getSunTimes();
   const pinned = forPreview ? 'auto' : c.get('pinnedPhase', 'auto');
@@ -99,7 +201,8 @@ function computeState(minute, { forPreview = false } = {}) {
   }
   const warmth = Math.max(0, Math.min(1, c.get('nightWarmth', 0.4)));
   const night = state.weights.night || 0;
-  const palette = P.withWarmth(P.blend(state.weights), warmth * night);
+  const frames = variant === 'light' ? P.LIGHT_KEYFRAMES : P.KEYFRAMES;
+  const palette = P.withWarmth(P.blend(state.weights, frames), warmth * night);
 
   const moon = FX.moonInfo();
   const fx = {
@@ -108,15 +211,16 @@ function computeState(minute, { forPreview = false } = {}) {
     flow: forPreview ? 0 : fun('flowGlow') ? live.flowLevel : 0,
     bugs: forPreview ? 0 : fun('bugMood') ? live.bugLevel : 0
   };
-  return { state, palette, sun, pinned, moon, fx };
+  return { state, palette, sun, pinned, moon, fx, variant };
 }
 
 /**
- * Writes colors into user settings, scoped to the Skymood Adaptive theme only.
+ * Writes colors into user settings, scoped to one adaptive theme (dark or light) only.
  * Compares against what settings hold now, not what this window last wrote: another window or
  * Settings Sync may have changed them since, and a write that changes nothing is skipped.
  */
-function applyColors(palette, fx) {
+function applyColors(palette, fx, variant) {
+  const KEY = keyFor(variant);
   const colors = FX.decorate(P.workbenchColors(palette), palette, fx);
   const tokens = { textMateRules: P.tokenRules(palette) };
 
@@ -176,7 +280,7 @@ async function render() {
   if (previewing || celebrating) return;
   const info = computeState(nowMinutes());
   updateStatus(info);
-  if (canWrite()) await applyColors(info.palette, info.fx);
+  if (canWrite()) await applyColors(info.palette, info.fx, info.variant);
   return info;
 }
 
@@ -259,7 +363,36 @@ function onDiagnostics() {
       render();
     }
     if (prev > 0 && count === 0 && fun('celebrate')) maybeCelebrate(prev, prevFiles, open);
+    trackPulse(count);
   }, DIAG_DEBOUNCE_MS);
+}
+
+/**
+ * New errors make the editor breathe soft red, once they've stuck around a few seconds (so a
+ * half-typed line doesn't set it off). Fixing some and breaking more pulses again, at most every
+ * PULSE_COOLDOWN_MS. The steady bug-mood tint is separate and stays while errors remain.
+ */
+function trackPulse(count) {
+  if (count === 0) {
+    live.pulsedErrors = 0;
+    clearTimeout(pulseHandle);
+    Pulse.stop();
+    return;
+  }
+  if (count <= live.pulsedErrors) {
+    live.pulsedErrors = count;
+    return;
+  }
+  clearTimeout(pulseHandle);
+  pulseHandle = setTimeout(() => {
+    const now = Date.now();
+    const n = scanErrors().count;
+    if (n <= live.pulsedErrors) return;
+    live.pulsedErrors = n;
+    if (!fun('errorPulse') || previewing || celebrating || !vscode.window.state.focused) return;
+    if (now - live.lastEdit > PULSE_EDIT_WINDOW_MS || now - live.lastPulse < PULSE_COOLDOWN_MS) return;
+    if (Pulse.play(FX.bugLevel(n))) live.lastPulse = now;
+  }, PULSE_SETTLE_MS);
 }
 
 /**
@@ -326,17 +459,19 @@ async function previewCycle() {
   previewing = true;
   try {
     if (!themeActive()) await selectTheme();
+    // The theme switch can land a moment after the setting, so pick the variant now and keep it.
+    const variant = activeVariant() || preferredVariant();
     await vscode.window.withProgress(
       { location: vscode.ProgressLocation.Notification, title: 'Skymood: previewing a full day', cancellable: true },
       async (progress, token) => {
         const frames = 48;
         for (let i = 0; i <= frames && !token.isCancellationRequested; i++) {
           const minute = (i / frames) * 1440;
-          const info = computeState(minute, { forPreview: true });
+          const info = computeState(minute, { forPreview: true, variant });
           const tag = info.fx.golden > 0.35 ? ' ✨ golden hour' : '';
           progress.report({ message: `${formatClock(minute)} · ${LABELS[info.state.dominant]}${tag}`, increment: 100 / frames });
           updateStatus(info, `$(play) ${formatClock(minute)}`);
-          await applyColors(info.palette, info.fx);
+          await applyColors(info.palette, info.fx, variant);
           await sleep(140);
         }
       }
@@ -391,8 +526,10 @@ async function removeOverrides() {
   const ed = vscode.workspace.getConfiguration('editor');
   const cc = { ...(wb.inspect('colorCustomizations')?.globalValue || {}) };
   const tc = { ...(ed.inspect('tokenColorCustomizations')?.globalValue || {}) };
-  delete cc[KEY];
-  delete tc[KEY];
+  for (const variant of Object.keys(THEMES)) {
+    delete cc[keyFor(variant)];
+    delete tc[keyFor(variant)];
+  }
   await wb.update('colorCustomizations', Object.keys(cc).length ? cc : undefined, vscode.ConfigurationTarget.Global);
   await ed.update('tokenColorCustomizations', Object.keys(tc).length ? tc : undefined, vscode.ConfigurationTarget.Global);
   vscode.window.showInformationMessage('Skymood: adaptive color overrides removed from your settings.');
@@ -400,12 +537,14 @@ async function removeOverrides() {
 
 async function menu() {
   const playful = cfg().get('playful.enabled', true);
+  const mode = appearance();
   const items = [
     { label: '$(play) Preview a full day', cmd: 'skymood.previewCycle' },
     { label: '$(pinned) Pin a phase / follow the sun', cmd: 'skymood.pickPhase' },
     { label: '$(location) Set location (sunrise & sunset)', cmd: 'skymood.setLocation' },
-    { label: `$(sparkle) Playful effects: ${playful ? 'on' : 'off'}`, description: 'Flow glow, bug mood, golden hour, moon', cmd: 'skymood.togglePlayful' },
+    { label: `$(sparkle) Playful effects: ${playful ? 'on' : 'off'}`, description: 'Flow glow, bug mood, error pulse, golden hour, moon', cmd: 'skymood.togglePlayful' },
     { label: '$(pass-filled) Celebrate!', description: 'Just because', cmd: 'skymood.celebrate' },
+    { label: `$(color-mode) Appearance: ${MODE_LABELS[mode]}`, description: 'Dark, light or system default', cmd: 'skymood.pickAppearance' },
     { label: '$(paintcan) Switch to Skymood Adaptive', cmd: 'skymood.enable' },
     { label: '$(gear) Settings', cmd: 'workbench.action.openSettings', args: ['skymood'] },
     { label: '$(trash) Remove adaptive overrides', cmd: 'skymood.removeOverrides' }
@@ -438,6 +577,7 @@ function activate(context) {
 
   const reg = (id, fn) => context.subscriptions.push(vscode.commands.registerCommand(id, fn));
   reg('skymood.enable', enable);
+  reg('skymood.pickAppearance', pickAppearance); // from the menu
   reg('skymood.previewCycle', previewCycle);
   reg('skymood.pickPhase', pickPhase);
   reg('skymood.setLocation', setLocation);
@@ -451,6 +591,7 @@ function activate(context) {
   live.errors = scan.count;
   live.errorFiles = scan.files;
   live.bugLevel = FX.bugLevel(scan.count);
+  live.pulsedErrors = scan.count; // errors already there at startup don't pulse
 
   context.subscriptions.push(
     statusItem,
@@ -458,14 +599,16 @@ function activate(context) {
     vscode.languages.onDidChangeDiagnostics(onDiagnostics),
     vscode.window.tabGroups.onDidChangeTabs(e => { if (e.opened.length || e.closed.length) onDiagnostics(); }),
     vscode.workspace.onDidChangeConfiguration(e => {
+      if (e.affectsConfiguration('skymood.appearance')) applyAppearance();
+      if (e.affectsConfiguration('window.autoDetectColorScheme')) syncAppearance();
       if (WATCHED_SETTINGS.some(s => e.affectsConfiguration(s))) render().then(scheduleLoop);
     }),
     // Fires once the new theme is on screen (the setting can land before the theme does) and when
     // the OS switches between light and dark under window.autoDetectColorScheme.
-    vscode.window.onDidChangeActiveColorTheme(() => render()),
+    vscode.window.onDidChangeActiveColorTheme(() => { syncAppearance(); render(); }),
     // Gaining focus makes this window the one that writes, so it puts its own colors back.
     vscode.window.onDidChangeWindowState(s => { if (s.focused) render(); }),
-    { dispose: () => { clearTimeout(loopHandle); clearInterval(flowHandle); clearTimeout(diagHandle); clearTimeout(cheerHandle); Confetti.stop(); } }
+    { dispose: () => { clearTimeout(loopHandle); clearInterval(flowHandle); clearTimeout(diagHandle); clearTimeout(cheerHandle); clearTimeout(pulseHandle); Confetti.stop(); Pulse.stop(); } }
   );
 
   flowHandle = setInterval(checkFlow, 15000);
@@ -487,7 +630,9 @@ function deactivate() {
   clearInterval(flowHandle);
   clearTimeout(diagHandle);
   clearTimeout(cheerHandle);
+  clearTimeout(pulseHandle);
   Confetti.stop();
+  Pulse.stop();
 }
 
 module.exports = { activate, deactivate };

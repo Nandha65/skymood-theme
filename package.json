@@ -1,8 +1,8 @@
 {
   "name": "skymood-theme",
   "displayName": "Skymood — Adaptive Day/Night Theme",
-  "description": "A living color theme that shifts with your day, plus playful touches: a glow when you are in the flow, a celebration when your errors hit zero, golden hour at sunset and the moon phase at night.",
-  "version": "1.1.0",
+  "description": "A living color theme, in dark and light, that shifts with your day, plus playful touches: a glow when you are in the flow, a soft red pulse when new errors appear, confetti when your errors hit zero, golden hour at sunset and the moon phase at night.",
+  "version": "1.2.0",
   "publisher": "mvnandhakumar",
   "author": {
     "name": "Nandha Kumar"
@@ -34,6 +34,7 @@
   "keywords": [
     "theme",
     "dark theme",
+    "light theme",
     "adaptive",
     "day night",
     "skymood",
@@ -45,7 +46,9 @@
     "flow state",
     "moon phase",
     "golden hour",
-    "fun"
+    "fun",
+    "confetti",
+    "errors"
   ],
   "main": "./extension.js",
   "extensionKind": [
@@ -81,6 +84,31 @@
         "label": "Skymood Dusk",
         "uiTheme": "vs-dark",
         "path": "./themes/skymood-dusk.json"
+      },
+      {
+        "label": "Skymood Adaptive Light",
+        "uiTheme": "vs",
+        "path": "./themes/skymood-adaptive-light.json"
+      },
+      {
+        "label": "Skymood Night Light",
+        "uiTheme": "vs",
+        "path": "./themes/skymood-night-light.json"
+      },
+      {
+        "label": "Skymood Dawn Light",
+        "uiTheme": "vs",
+        "path": "./themes/skymood-dawn-light.json"
+      },
+      {
+        "label": "Skymood Daylight",
+        "uiTheme": "vs",
+        "path": "./themes/skymood-daylight.json"
+      },
+      {
+        "label": "Skymood Dusk Light",
+        "uiTheme": "vs",
+        "path": "./themes/skymood-dusk-light.json"
       }
     ],
     "commands": [
@@ -128,6 +156,27 @@
     "configuration": {
       "title": "Skymood",
       "properties": {
+        "skymood.appearance": {
+          "type": "string",
+          "enum": [
+            "dark",
+            "light",
+            "system"
+          ],
+          "enumItemLabels": [
+            "Dark",
+            "Light",
+            "System default"
+          ],
+          "enumDescriptions": [
+            "Skymood Adaptive: deep sky colors.",
+            "Skymood Adaptive Light: the same four moods on paper.",
+            "Follow your OS: dark when your OS is dark, light when it's light. Turns on VS Code's window.autoDetectColorScheme."
+          ],
+          "default": "dark",
+          "order": 0,
+          "markdownDescription": "Dark, light, or follow your OS (**System default**). Switches right away while Skymood is your theme. Choosing Dark or Light turns off `window.autoDetectColorScheme` if it was on; System default turns it on."
+        },
         "skymood.mode": {
           "type": "string",
           "enum": [
@@ -218,6 +267,11 @@
           "type": "boolean",
           "default": true,
           "description": "The editor and status bar tint subtly warmer as errors pile up in your open files."
+        },
+        "skymood.playful.errorPulse": {
+          "type": "boolean",
+          "default": true,
+          "description": "When new errors appear in your open files and stay for a few seconds, the editor slowly fades to a soft red and back, twice. At most once every 30 seconds. Skipped when workbench.reduceMotion is on."
         },
         "skymood.playful.celebrate": {
           "type": "boolean",

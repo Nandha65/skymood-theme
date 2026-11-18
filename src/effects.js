@@ -3,10 +3,13 @@
  * Playful effects layered on top of the base Skymood palette.
  * All pure functions: given colors + effect state, return new colors.
  */
-const { mix } = require('./palette');
+const { mix, isLight } = require('./palette');
 
-const GOLD = '#ffc46b';
-const MOONLIGHT = '#cfd8ff';
+// On a light palette, pale gold and moonlight would wash accents out, so deeper tones are used
+// there, and the flow glow makes accents richer (toward black) instead of brighter.
+const GOLD = { dark: '#ffc46b', light: '#b8740f' };
+const MOONLIGHT = { dark: '#cfd8ff', light: '#4f5cc4' };
+const GLOW = { dark: '#ffffff', light: '#000000' };
 const ERROR_RED = '#ff3b3b';
 
 const ACCENT_KEYS = [
@@ -104,14 +107,16 @@ function decorate(base, p, fx) {
   const moonGlow = fx.moonGlow || 0;
   const flow = (fx.flow || 0) / 3;
   const bugs = (fx.bugs || 0) / 3;
+  const tone = isLight(p) ? 'light' : 'dark';
+  const gold = GOLD[tone];
 
   if (golden > 0) {
-    shift(c, ACCENT_KEYS, GOLD, 0.75 * golden);
-    shift(c, SURFACE_KEYS, GOLD, 0.05 * golden);
-    shift(c, ['editor.lineHighlightBackground', 'tab.activeBorder'], GOLD, 0.08 * golden);
+    shift(c, ACCENT_KEYS, gold, 0.75 * golden);
+    shift(c, SURFACE_KEYS, GOLD.dark, 0.05 * golden); // pale gold warms light and dark surfaces alike
+    shift(c, ['editor.lineHighlightBackground', 'tab.activeBorder'], GOLD.dark, 0.08 * golden);
   }
   if (moonGlow > 0) {
-    shift(c, ACCENT_KEYS, MOONLIGHT, 0.55 * moonGlow);
+    shift(c, ACCENT_KEYS, MOONLIGHT[tone], 0.55 * moonGlow);
   }
   if (bugs > 0) {
     shift(c, ['editor.background', 'editorGutter.background', 'minimap.background'], ERROR_RED, 0.045 * bugs);
@@ -121,7 +126,7 @@ function decorate(base, p, fx) {
     c['editorLineNumber.activeForeground'] = p.constant;
   }
   if (flow > 0) {
-    shift(c, ACCENT_KEYS, '#ffffff', 0.15 * flow);
+    shift(c, ACCENT_KEYS, GLOW[tone], 0.15 * flow);
     c['editor.lineHighlightBackground'] = mix(p.lineHL, p.accent, 0.1 * flow);
     c['editor.lineHighlightBorder'] = p.accent + Math.round(0x40 * flow).toString(16).padStart(2, '0');
     if (!bugs) {

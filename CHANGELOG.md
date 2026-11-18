@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.2.0
+- 🌓 Light versions. **Skymood Adaptive Light** blends four light palettes through the day, just like the dark one: warm cream at night, rose at dawn, crisp white by day, peach at dusk. Every effect works on it, retuned so accents stay readable on a light background, and code text stays at or above WCAG AA all day. Static **Skymood Night Light**, **Dawn Light**, **Daylight** and **Dusk Light** themes are included too.
+- New setting `skymood.appearance`: **Dark** (the default, as before), **Light** or **System default**, which follows your OS. Switch it from the Skymood menu in the status bar (**Appearance**) or in settings, and the theme changes right away. System default turns on VS Code's `window.autoDetectColorScheme`; Dark and Light turn it off. If you already follow your OS appearance, Skymood starts in System default. Picking a Skymood theme from VS Code's theme picker updates the setting to match.
+- 🐞 Errors now get a gentle heads-up: when new errors appear in your open files and stay for a few seconds, the editor slowly fades to a soft red and back, twice. The more errors, the deeper the red, but it stays mild. It pulses at most once every 30 seconds and only for errors from your own typing, so opening a file with old errors stays quiet. Nothing is written to your settings.
+- New setting `skymood.playful.errorPulse`. Skipped when `workbench.reduceMotion` is on; the steady bug-mood tint still shows.
+- The Marketplace page now describes the confetti celebrations from 1.1.0 and the light versions.
+
 ## 1.1.0
 - 🎉 Celebrations are now confetti. It bursts over your editor in the colors of the current hour, around a badge that says what you did ("🙌  3 errors fixed!"). This replaces the slow status bar fade: it starts about a second after your fix, and nothing is written to your settings.
 - Bigger fixes get bigger parties: more confetti for three or more errors, and a double burst for ten or more. The badge emoji changes each time.

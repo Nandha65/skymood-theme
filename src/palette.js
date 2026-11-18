@@ -45,6 +45,45 @@ const KEYFRAMES = {
   }
 };
 
+/**
+ * Light counterparts: the same four moods on paper instead of sky. Night is warm cream with
+ * low-blue ink, dawn is rose on lavender-white, day is crisp cool white, dusk is peach.
+ */
+const LIGHT_KEYFRAMES = {
+  night: {
+    bg: '#f6f0e6', bgAlt: '#efe7da', bgDeep: '#e7ddcd',
+    fg: '#3b3129', muted: '#7d6d5e', accent: '#a34f19',
+    border: '#dccfbc', selection: '#ecd3b4', lineHL: '#efe6d8',
+    keyword: '#a3304b', string: '#56640f', func: '#8f4410', type: '#773b88',
+    number: '#9e4119', comment: '#806f60', variable: '#3b3129', constant: '#ab3626',
+    operator: '#74553f', tag: '#a3304b', property: '#6b4c30', param: '#7f4e20'
+  },
+  dawn: {
+    bg: '#faf7fa', bgAlt: '#f3eef4', bgDeep: '#ebe4ee',
+    fg: '#34303f', muted: '#736c86', accent: '#b23d6f',
+    border: '#e0d7e5', selection: '#f0d6e4', lineHL: '#f2ecf3',
+    keyword: '#aa3069', string: '#2b7349', func: '#9a4e0f', type: '#2c5eb0',
+    number: '#a7501a', comment: '#78718c', variable: '#34303f', constant: '#b93746',
+    operator: '#635880', tag: '#aa3069', property: '#784163', param: '#865426'
+  },
+  day: {
+    bg: '#fbfcfe', bgAlt: '#f2f5fa', bgDeep: '#e8edf5',
+    fg: '#1f2a3d', muted: '#5f6d85', accent: '#0a6fb0',
+    border: '#d8e0ec', selection: '#cfe2f7', lineHL: '#eef3fa',
+    keyword: '#7d35b3', string: '#2a752a', func: '#2357be', type: '#0d7469',
+    number: '#a65300', comment: '#647189', variable: '#1f2a3d', constant: '#c0343a',
+    operator: '#0c6887', tag: '#bd2d52', property: '#33558a', param: '#8c520d'
+  },
+  dusk: {
+    bg: '#fbf5f3', bgAlt: '#f4ebe9', bgDeep: '#ece1df',
+    fg: '#3a2b35', muted: '#7d6876', accent: '#b84a22',
+    border: '#e2d2d0', selection: '#f3d4cc', lineHL: '#f4eae8',
+    keyword: '#b42d6d', string: '#7a5a00', func: '#a94a1a', type: '#6446bb',
+    number: '#a1520f', comment: '#816d7b', variable: '#3a2b35', constant: '#b92d4c',
+    operator: '#874b6d', tag: '#b42d6d', property: '#7e4366', param: '#985323'
+  }
+};
+
 // ---------- color helpers ----------
 function hexToRgb(hex) {
   const h = hex.replace('#', '');
@@ -113,14 +152,15 @@ function stateAt(minute, sunrise, sunset) {
   return { weights, dominant, from: p0, to: p1, progress: f };
 }
 
-function blend(weights) {
+/** Blends keyframe palettes by phase weight; pass LIGHT_KEYFRAMES for the light variant. */
+function blend(weights, frames = KEYFRAMES) {
   const out = {};
-  for (const key of Object.keys(KEYFRAMES.day)) {
+  for (const key of Object.keys(frames.day)) {
     const acc = [0, 0, 0];
     for (const p of PHASES) {
       const w = weights[p] || 0;
       if (!w) continue;
-      hexToRgb(KEYFRAMES[p][key]).forEach((v, i) => (acc[i] += v * w));
+      hexToRgb(frames[p][key]).forEach((v, i) => (acc[i] += v * w));
     }
     out[key] = rgbToHex(acc);
   }
@@ -136,14 +176,20 @@ function withWarmth(p, amount) {
 }
 
 // ---------- theme builders ----------
+/** True for a light palette (light editor background). */
+const isLight = p => luminance(p.bg) > 0.5;
+
 function workbenchColors(p) {
+  const light = isLight(p);
+  const onAccent = light ? '#ffffff' : p.bgDeep; // text on accent-colored buttons and badges
+  const bright = c => mix(c, light ? '#000000' : '#ffffff', light ? 0.15 : 0.2); // terminal bright colors
   return {
     'foreground': p.fg,
     'descriptionForeground': p.muted,
     'icon.foreground': p.muted,
     'focusBorder': alpha(p.accent, 0.55),
     'selection.background': alpha(p.selection, 0.9),
-    'widget.shadow': '#00000059',
+    'widget.shadow': light ? '#00000024' : '#00000059',
     'textLink.foreground': p.accent,
     'textLink.activeForeground': mix(p.accent, p.fg, 0.3),
 
@@ -231,7 +277,7 @@ function workbenchColors(p) {
     'activityBar.activeBorder': p.accent,
     'activityBar.border': p.bgDeep,
     'activityBarBadge.background': p.accent,
-    'activityBarBadge.foreground': p.bgDeep,
+    'activityBarBadge.foreground': onAccent,
 
     'sideBar.background': p.bgAlt,
     'sideBar.foreground': mix(p.fg, p.muted, 0.35),
@@ -256,10 +302,10 @@ function workbenchColors(p) {
     'statusBar.border': p.border,
     'statusBar.noFolderBackground': p.bgDeep,
     'statusBar.debuggingBackground': p.constant,
-    'statusBar.debuggingForeground': p.bgDeep,
+    'statusBar.debuggingForeground': onAccent,
     'statusBarItem.hoverBackground': p.lineHL,
     'statusBarItem.remoteBackground': p.accent,
-    'statusBarItem.remoteForeground': p.bgDeep,
+    'statusBarItem.remoteForeground': onAccent,
     'statusBarItem.prominentBackground': p.selection,
 
     'titleBar.activeBackground': p.bgDeep,
@@ -281,22 +327,22 @@ function workbenchColors(p) {
     'terminal.foreground': p.fg,
     'terminalCursor.foreground': p.accent,
     'terminal.selectionBackground': alpha(p.selection, 0.9),
-    'terminal.ansiBlack': p.bgDeep,
+    'terminal.ansiBlack': light ? p.fg : p.bgDeep,
     'terminal.ansiRed': p.constant,
     'terminal.ansiGreen': p.string,
     'terminal.ansiYellow': p.number,
     'terminal.ansiBlue': p.func,
     'terminal.ansiMagenta': p.keyword,
     'terminal.ansiCyan': p.type,
-    'terminal.ansiWhite': p.fg,
-    'terminal.ansiBrightBlack': p.muted,
-    'terminal.ansiBrightRed': mix(p.constant, '#ffffff', 0.2),
-    'terminal.ansiBrightGreen': mix(p.string, '#ffffff', 0.2),
-    'terminal.ansiBrightYellow': mix(p.number, '#ffffff', 0.2),
-    'terminal.ansiBrightBlue': mix(p.func, '#ffffff', 0.2),
-    'terminal.ansiBrightMagenta': mix(p.keyword, '#ffffff', 0.2),
-    'terminal.ansiBrightCyan': mix(p.type, '#ffffff', 0.2),
-    'terminal.ansiBrightWhite': '#ffffff',
+    'terminal.ansiWhite': light ? p.muted : p.fg,
+    'terminal.ansiBrightBlack': light ? mix(p.fg, p.muted, 0.5) : p.muted,
+    'terminal.ansiBrightRed': bright(p.constant),
+    'terminal.ansiBrightGreen': bright(p.string),
+    'terminal.ansiBrightYellow': bright(p.number),
+    'terminal.ansiBrightBlue': bright(p.func),
+    'terminal.ansiBrightMagenta': bright(p.keyword),
+    'terminal.ansiBrightCyan': bright(p.type),
+    'terminal.ansiBrightWhite': light ? mix(p.muted, p.bg, 0.3) : '#ffffff',
 
     'input.background': p.bgDeep,
     'input.foreground': p.fg,
@@ -315,14 +361,14 @@ function workbenchColors(p) {
     'pickerGroup.border': p.border,
 
     'button.background': p.accent,
-    'button.foreground': p.bgDeep,
-    'button.hoverBackground': mix(p.accent, '#ffffff', 0.15),
+    'button.foreground': onAccent,
+    'button.hoverBackground': mix(p.accent, light ? '#000000' : '#ffffff', 0.15),
     'button.secondaryBackground': p.selection,
     'button.secondaryForeground': p.fg,
     'badge.background': p.accent,
-    'badge.foreground': p.bgDeep,
+    'badge.foreground': onAccent,
     'progressBar.background': p.accent,
-    'scrollbar.shadow': '#00000040',
+    'scrollbar.shadow': light ? '#00000018' : '#00000040',
     'scrollbarSlider.background': alpha(p.muted, 0.18),
     'scrollbarSlider.hoverBackground': alpha(p.muted, 0.3),
     'scrollbarSlider.activeBackground': alpha(p.accent, 0.45),
@@ -379,6 +425,6 @@ function tokenRules(p) {
 }
 
 module.exports = {
-  PHASES, KEYFRAMES, stateAt, blend, withWarmth, workbenchColors, tokenRules,
-  mix, alpha, contrast
+  PHASES, KEYFRAMES, LIGHT_KEYFRAMES, stateAt, blend, withWarmth, workbenchColors, tokenRules,
+  mix, alpha, contrast, isLight
 };

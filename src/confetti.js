@@ -118,7 +118,7 @@ const emojiOnly = label => !/[\p{L}\p{N}]/u.test(label);
 /** Roughly half the badge's width in px, so it never slides past the editor's left edge. */
 function badgeHalfWidth(label) {
   if (emojiOnly(label)) return 48;
-  return Math.ceil(([...label].length * 16 + 52) / 2);
+  return Math.ceil(([...label].length * 11 + 40) / 2);
 }
 
 /** CSS for the horizontal centre of an editor; see the header comment. */
@@ -177,7 +177,7 @@ function play(kind = 'party', opts = {}) {
         backgroundColor: opts.background,
         textDecoration: css([
           'position: absolute', `left: ${centre}`, `top: ${BADGE_TOP}`, `transform: translate(-50%, -50%) scale(${b.scale})`,
-          'font-size: 26px', 'font-weight: 600', 'line-height: 1', 'padding: 14px 24px', 'border-radius: 999px',
+          'font-size: 18px', 'font-weight: 600', 'line-height: 1', 'padding: 10px 18px', 'border-radius: 999px',
           `border: 2px solid ${opts.color || 'currentColor'}`, 'box-shadow: 0 8px 30px rgba(0,0,0,0.45)',
           'white-space: nowrap', `opacity: ${b.opacity}`, 'pointer-events: none', 'z-index: 11'
         ])

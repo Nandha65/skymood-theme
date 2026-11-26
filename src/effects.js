@@ -4,6 +4,7 @@
  * All pure functions: given colors + effect state, return new colors.
  */
 const { mix, isLight } = require('./palette');
+const { moonInfo, goldenAmount } = require('./solar'); // sky math lives in solar.js; re-exported below
 
 // On a light palette, pale gold and moonlight would wash accents out, so deeper tones are used
 // there, and the flow glow makes accents richer (toward black) instead of brighter.
@@ -31,34 +32,6 @@ function mixA(value, target, t) {
 }
 function shift(colors, keys, target, t) {
   for (const k of keys) if (colors[k]) colors[k] = mixA(colors[k], target, t);
-}
-
-// ---------- sky ----------
-const SYNODIC = 29.530588853;
-const KNOWN_NEW_MOON = Date.UTC(2000, 0, 6, 18, 14);
-const MOON_NAMES = [
-  [0.0339, 'New moon', '🌑'], [0.216, 'Waxing crescent', '🌒'], [0.284, 'First quarter', '🌓'],
-  [0.466, 'Waxing gibbous', '🌔'], [0.534, 'Full moon', '🌕'], [0.716, 'Waning gibbous', '🌖'],
-  [0.784, 'Last quarter', '🌗'], [0.966, 'Waning crescent', '🌘'], [1.01, 'New moon', '🌑']
-];
-function moonInfo(date = new Date()) {
-  const days = (date.getTime() - KNOWN_NEW_MOON) / 86400000;
-  const age = ((days % SYNODIC) + SYNODIC) % SYNODIC;
-  const f = age / SYNODIC;
-  const illumination = (1 - Math.cos(2 * Math.PI * f)) / 2;
-  const [, name, emoji] = MOON_NAMES.find(([lim]) => f < lim);
-  return { name, emoji, illumination, age };
-}
-
-/** 0..1 golden-hour strength around sunrise and sunset. */
-function goldenAmount(minute, sunrise, sunset) {
-  const bell = (center, width) => {
-    let d = Math.abs(minute - center);
-    d = Math.min(d, 1440 - d);
-    const x = Math.max(0, 1 - d / width);
-    return x * x * (3 - 2 * x);
-  };
-  return Math.max(bell(sunset - 15, 40), 0.7 * bell(sunrise + 20, 35));
 }
 
 // ---------- activity levels ----------

@@ -126,15 +126,16 @@ const wrap = m => ((m % 1440) + 1440) % 1440;
  * @param {number} minute minutes since local midnight
  * @param {number} sunrise minutes since midnight
  * @param {number} sunset minutes since midnight
+ * @param {number} [twilight] stretches the night<->day transitions (1 = default, >1 = longer twilight)
  */
-function stateAt(minute, sunrise, sunset) {
+function stateAt(minute, sunrise, sunset, twilight = 1) {
   const anchors = [
-    [sunrise - 90, 'night'],
+    [sunrise - 90 * twilight, 'night'],
     [sunrise + 30, 'dawn'],
     [sunrise + 150, 'day'],
     [sunset - 120, 'day'],
     [sunset, 'dusk'],
-    [sunset + 90, 'night']
+    [sunset + 90 * twilight, 'night']
   ].map(([m, p]) => [wrap(m), p]).sort((a, b) => a[0] - b[0]);
 
   const t = wrap(minute);
@@ -426,5 +427,5 @@ function tokenRules(p) {
 
 module.exports = {
   PHASES, KEYFRAMES, LIGHT_KEYFRAMES, stateAt, blend, withWarmth, workbenchColors, tokenRules,
-  mix, alpha, contrast, isLight
+  mix, alpha, contrast, luminance, isLight, hexToRgb, rgbToHex
 };

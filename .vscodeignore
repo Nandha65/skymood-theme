@@ -1,6 +1,7 @@
 .github/**
 .vscode/**
 scripts/**
+test/**
 images/day-cycle.gif
 images/playful.png
 .gitignore

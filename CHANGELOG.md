@@ -1,5 +1,15 @@
 # Changelog
 
+## 2.0.0
+- 🌦️ **Atmosphere profiles**: Clear (default), Overcast, Arctic and Amber, layered over the four solar phases in dark and light. New setting `skymood.atmosphere` and command **Select Atmosphere Profile**.
+- 📍 **City picker**: **Set Location** now lists 350 major cities (offline), or accepts coordinates as before. Picking a city sets latitude, longitude and the new `skymood.cityName`, switches to solar mode and repaints right away.
+- 🧭 The status bar menu is regrouped (Appearance, Atmosphere, Time & place, Playful, Share & sync) with live status in the placeholder, such as `Dusk · Clear · 🌕 Full moon · 🔥 18m`.
+- 📋 **Copy Setup Card (Share Your Sky)**: a Markdown card for your phase, location, atmosphere, moon and longest flow streak, with an optional 600×240 SVG.
+- 🔄 **Configure Settings Sync for Multi-Machine**: adds Skymood's two color settings to `settingsSync.ignoredSettings` without touching your other entries, and offers a one-time tip if another machine keeps rewriting your colors.
+- A single, one-time thank-you after 10 celebrations or 5 hours in flow. Only counts and durations are stored, locally.
+- Phases now blend in OKLab for cleaner in-between colors, and a WCAG contrast clamp runs after atmosphere, warmth and playful tints. `npm test` verifies sunrise/sunset, moon phase and contrast across every minute of the day.
+- The sky math moved to `src/solar.js` (`src/sun.js` re-exports it). All command IDs, settings and theme files are unchanged.
+
 ## 1.2.0
 - 🌓 Light versions. **Skymood Adaptive Light** blends four light palettes through the day, just like the dark one: warm cream at night, rose at dawn, crisp white by day, peach at dusk. Every effect works on it, retuned so accents stay readable on a light background, and code text stays at or above WCAG AA all day. Static **Skymood Night Light**, **Dawn Light**, **Daylight** and **Dusk Light** themes are included too.
 - New setting `skymood.appearance`: **Dark** (the default, as before), **Light** or **System default**, which follows your OS. Switch it from the Skymood menu in the status bar (**Appearance**) or in settings, and the theme changes right away. System default turns on VS Code's `window.autoDetectColorScheme`; Dark and Light turn it off. If you already follow your OS appearance, Skymood starts in System default. Picking a Skymood theme from VS Code's theme picker updates the setting to match.

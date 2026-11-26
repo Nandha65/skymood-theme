@@ -22,5 +22,7 @@ jobs:
       - uses: actions/setup-node@v5
         with:
           node-version: 22
+      - name: Test
+        run: npm test
       - name: Publish (rebuilds themes via vscode:prepublish)
         run: npx --yes @vscode/vsce publish --oidc

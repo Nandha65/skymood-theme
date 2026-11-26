@@ -4,7 +4,9 @@ const P = require('./src/palette');
 const FX = require('./src/effects');
 const Confetti = require('./src/confetti');
 const Pulse = require('./src/pulse');
-const { sunTimes, parseClock, formatClock } = require('./src/sun');
+const { sunTimes, parseClock, formatClock } = require('./src/solar');
+const CE = require('./src/colorEngine');
+const Sync = require('./src/syncAndShare');
 
 /** The two adaptive themes. Each gets its own colors in settings, scoped to its name. */
 const THEMES = { dark: 'Skymood Adaptive', light: 'Skymood Adaptive Light' };
@@ -33,6 +35,11 @@ let statusItem;
 let previewing = false;
 let celebrating = false;
 let writeChain = Promise.resolve();
+let extContext; // the extension context, for globalState (stats, one-time flags)
+let flowTicks = 0; // 15s flow ticks since activation, to persist flow time in steps
+const overwrites = new Sync.OverwriteDetector();
+let lastOwnWrite = 0; // when this window last wrote colors, to tell its own changes from others'
+let lastWritten = null; // the scoped colors this window last wrote, per theme key
 
 // Live playful state
 const live = {
@@ -162,17 +169,22 @@ async function pickAppearance() {
     { label: '$(device-desktop) System default', description: 'Dark or light, following your OS', value: 'system' }
   ].map(i => ({ ...i, detail: i.value === current ? 'Current' : undefined }));
   const choice = await vscode.window.showQuickPick(items, { placeHolder: 'Skymood: appearance' });
-  if (!choice) return;
+  if (choice) await setAppearance(choice.value);
+}
+
+/** Switches to dark, light or system, and turns Skymood on if another theme is showing. */
+async function setAppearance(value) {
+  const current = appearance();
   const wasSelected = skymoodSelected();
-  if (choice.value !== current) {
+  if (value !== current) {
     applying = true; // switch once, below, rather than also from the settings listener
     try {
-      await cfg().update('appearance', choice.value, vscode.ConfigurationTarget.Global);
+      await cfg().update('appearance', value, vscode.ConfigurationTarget.Global);
     } finally {
       applying = false;
     }
   }
-  if (choice.value !== current || !wasSelected) await enable();
+  if (value !== current || !wasSelected) await enable();
 }
 
 /** Sunrise/sunset for today, from location (solar mode) or fixed clock times. */
@@ -188,30 +200,24 @@ function getSunTimes() {
   return fallback;
 }
 
-/** Full visual state for a minute of the day: phase blend + playful effects. */
+/** Full visual state for a minute of the day: phase blend, atmosphere, playful effects, readability clamp. */
 function computeState(minute, { forPreview = false, variant = activeVariant() || preferredVariant() } = {}) {
   const c = cfg();
   const sun = getSunTimes();
   const pinned = forPreview ? 'auto' : c.get('pinnedPhase', 'auto');
-  let state;
-  if (pinned !== 'auto' && P.PHASES.includes(pinned)) {
-    state = { weights: { night: 0, dawn: 0, day: 0, dusk: 0, [pinned]: 1 }, dominant: pinned, from: pinned, to: pinned, progress: 0 };
-  } else {
-    state = P.stateAt(minute, sun.sunrise, sun.sunset);
-  }
+  const atmosphere = CE.ATMOSPHERES[c.get('atmosphere')] ? c.get('atmosphere') : 'clear';
   const warmth = Math.max(0, Math.min(1, c.get('nightWarmth', 0.4)));
-  const night = state.weights.night || 0;
-  const frames = variant === 'light' ? P.LIGHT_KEYFRAMES : P.KEYFRAMES;
-  const palette = P.withWarmth(P.blend(state.weights, frames), warmth * night);
 
   const moon = FX.moonInfo();
+  const night = CE.phaseState(minute, sun.sunrise, sun.sunset, pinned, atmosphere).weights.night || 0; // scales the moonlight accent
   const fx = {
     golden: pinned === 'auto' && fun('goldenHour') ? FX.goldenAmount(minute, sun.sunrise, sun.sunset) : 0,
     moonGlow: fun('moonPhase') && moon.illumination > 0.97 ? night : 0,
     flow: forPreview ? 0 : fun('flowGlow') ? live.flowLevel : 0,
     bugs: forPreview ? 0 : fun('bugMood') ? live.bugLevel : 0
   };
-  return { state, palette, sun, pinned, moon, fx, variant };
+  const out = CE.compose({ minute, sunrise: sun.sunrise, sunset: sun.sunset, variant, atmosphere, warmth, pinned, fx });
+  return { state: out.state, palette: out.palette, colors: out.colors, tokens: out.tokens, sun, pinned, moon, fx, variant, atmosphere };
 }
 
 /**
@@ -219,26 +225,44 @@ function computeState(minute, { forPreview = false, variant = activeVariant() ||
  * Compares against what settings hold now, not what this window last wrote: another window or
  * Settings Sync may have changed them since, and a write that changes nothing is skipped.
  */
-function applyColors(palette, fx, variant) {
+function applyColors(info, variant) {
   const KEY = keyFor(variant);
-  const colors = FX.decorate(P.workbenchColors(palette), palette, fx);
-  const tokens = { textMateRules: P.tokenRules(palette) };
+  const colors = info.colors;
+  const tokens = { textMateRules: info.tokens };
 
   writeChain = writeChain.then(async () => {
     const wb = vscode.workspace.getConfiguration('workbench');
     const ed = vscode.workspace.getConfiguration('editor');
     const colorCustom = { ...(wb.inspect('colorCustomizations')?.globalValue || {}) };
     const tokenCustom = { ...(ed.inspect('tokenColorCustomizations')?.globalValue || {}) };
+    lastWritten = { ...(lastWritten || {}), [KEY]: colors };
     if (!sameJson(colorCustom[KEY], colors)) {
       colorCustom[KEY] = colors;
+      lastOwnWrite = Date.now();
       await wb.update('colorCustomizations', colorCustom, vscode.ConfigurationTarget.Global);
     }
     if (!sameJson(tokenCustom[KEY], tokens)) {
       tokenCustom[KEY] = tokens;
+      lastOwnWrite = Date.now();
       await ed.update('tokenColorCustomizations', tokenCustom, vscode.ConfigurationTarget.Global);
     }
+    lastOwnWrite = Date.now();
   }).catch(err => console.error('[Skymood] failed to apply colors', err));
   return writeChain;
+}
+
+/**
+ * Called when color settings change. A change this window didn't just make, to the colors this
+ * window last wrote, is another window or machine repainting. Repeated, that's the Settings Sync
+ * ping-pong, and the one-time tip points at skymood.configureSync.
+ */
+function checkForeignOverwrite() {
+  // Only while focused: then this window is the one that writes, so a change it didn't make is foreign.
+  if (!lastWritten || !vscode.window.state.focused || Date.now() - lastOwnWrite < 3000 || !themeActive()) return;
+  const KEY = keyFor(activeVariant());
+  const now = vscode.workspace.getConfiguration('workbench').inspect('colorCustomizations')?.globalValue?.[KEY];
+  if (!lastWritten[KEY] || sameJson(now, lastWritten[KEY])) return;
+  if (overwrites.record()) Sync.offerSyncTip(vscode, extContext);
 }
 
 function flowMinutes() {
@@ -267,7 +291,9 @@ function updateStatus(info, labelOverride) {
   md.appendMarkdown(`**Skymood** · ${LABELS[d]} (${Math.round(Math.max(...Object.values(state.weights)) * 100)}%)\n\n`);
   if (pinned !== 'auto') md.appendMarkdown(`Pinned to **${LABELS[pinned]}**\n\n`);
   else if (state.from !== state.to) md.appendMarkdown(`Shifting ${LABELS[state.from]} → ${LABELS[state.to]} (${Math.round(state.progress * 100)}%)\n\n`);
-  md.appendMarkdown(`☀️ Sunrise ${formatClock(sun.sunrise)} · Sunset ${formatClock(sun.sunset)} _(${sun.source === 'solar' ? 'your location' : 'fixed times'})_\n\n`);
+  md.appendMarkdown(`🌤️ Atmosphere: **${CE.ATMOSPHERES[info.atmosphere].label}** · [change](command:skymood.selectAtmosphere)\n\n`);
+  const place = cfg().get('cityName', '');
+  md.appendMarkdown(`☀️ Sunrise ${formatClock(sun.sunrise)} · Sunset ${formatClock(sun.sunset)} _(${sun.source === 'solar' ? (place || 'your location') : 'fixed times'})_\n\n`);
   if (fun('moonPhase')) md.appendMarkdown(`${moon.emoji} ${moon.name}, ${Math.round(moon.illumination * 100)}% lit${fx.moonGlow ? ' (moonlight accent on)' : ''}\n\n`);
   if (fun('flowGlow')) md.appendMarkdown(`🔥 Flow: ${fx.flow ? `level ${fx.flow}/3, ${Math.floor(flowMinutes())} min` : 'warming up (5 min of steady typing)'}\n\n`);
   if (fun('bugMood')) md.appendMarkdown(`🐞 Errors in open files: ${live.errors}${live.errors ? '' : ' (clean!)'}\n\n`);
@@ -280,7 +306,7 @@ async function render() {
   if (previewing || celebrating) return;
   const info = computeState(nowMinutes());
   updateStatus(info);
-  if (canWrite()) await applyColors(info.palette, info.fx, info.variant);
+  if (canWrite()) await applyColors(info, info.variant);
   return info;
 }
 
@@ -305,7 +331,12 @@ function onEdit(e) {
 }
 
 function checkFlow() {
-  const level = FX.flowLevel(flowMinutes());
+  const minutes = flowMinutes();
+  // Only durations are kept (never what you type): time in flow and your longest streak.
+  if (extContext && minutes >= 5 && vscode.window.state.focused) {
+    Sync.addFlow(extContext, 15, minutes).then(() => Sync.checkMilestone(vscode, extContext));
+  }
+  const level = FX.flowLevel(minutes);
   if (level !== live.flowLevel) {
     // Reaching a new flow milestone (5, 15, 30 min) gets a 🔥 badge (no confetti mid-typing).
     if (level > live.flowLevel && fun('flowGlow') && fun('confetti') && vscode.window.state.focused) {
@@ -432,8 +463,10 @@ const badgeFor = (palette, label, tint = 'string') => ({
  */
 async function celebrate(moment) {
   if (celebrating || previewing) return;
-  const { kind, label, text } = moment && moment.kind ? moment : PARTY; // the command passes no args
+  const real = Boolean(moment && moment.kind); // a fix, not the command
+  const { kind, label, text } = real ? moment : PARTY; // the command passes no args
   celebrating = true;
+  if (real && extContext) Sync.addVictory(extContext).then(() => Sync.checkMilestone(vscode, extContext));
   try {
     const info = computeState(nowMinutes());
     updateStatus(info, text);
@@ -471,7 +504,7 @@ async function previewCycle() {
           const tag = info.fx.golden > 0.35 ? ' ✨ golden hour' : '';
           progress.report({ message: `${formatClock(minute)} · ${LABELS[info.state.dominant]}${tag}`, increment: 100 / frames });
           updateStatus(info, `$(play) ${formatClock(minute)}`);
-          await applyColors(info.palette, info.fx, variant);
+          await applyColors(info, variant);
           await sleep(140);
         }
       }
@@ -492,7 +525,16 @@ async function pickPhase() {
   if (choice) await cfg().update('pinnedPhase', choice.value, vscode.ConfigurationTarget.Global);
 }
 
-async function setLocation() {
+/** Cities from data/cities.json, loaded once and only when the picker opens. */
+let cityList;
+const cities = () => cityList || (cityList = [...require('./data/cities.json')].sort((a, b) => a.name.localeCompare(b.name)));
+
+const parseCoords = v => {
+  const m = /^\s*(-?\d+(\.\d+)?)\s*,\s*(-?\d+(\.\d+)?)\s*$/.exec(v);
+  return m ? [+m[1], +m[3]] : null;
+};
+
+async function askCoordinates() {
   const c = cfg();
   const existing = typeof c.get('latitude') === 'number' ? `${c.get('latitude')}, ${c.get('longitude')}` : '';
   const value = await vscode.window.showInputBox({
@@ -500,19 +542,73 @@ async function setLocation() {
     prompt: 'Latitude, longitude (e.g. 12.97, 77.59 for Bengaluru). Used offline only, to compute sunrise and sunset.',
     value: existing,
     validateInput: v => {
-      const m = /^\s*(-?\d+(\.\d+)?)\s*,\s*(-?\d+(\.\d+)?)\s*$/.exec(v);
-      if (!m) return 'Enter as: latitude, longitude';
-      if (Math.abs(+m[1]) > 90 || Math.abs(+m[3]) > 180) return 'Latitude must be within ±90 and longitude within ±180';
+      const xy = parseCoords(v);
+      if (!xy) return 'Enter as: latitude, longitude';
+      if (Math.abs(xy[0]) > 90 || Math.abs(xy[1]) > 180) return 'Latitude must be within ±90 and longitude within ±180';
       return null;
     }
   });
-  if (!value) return;
-  const [lat, lon] = value.split(',').map(s => Math.round(parseFloat(s) * 100) / 100);
-  await c.update('latitude', lat, vscode.ConfigurationTarget.Global);
-  await c.update('longitude', lon, vscode.ConfigurationTarget.Global);
-  await c.update('mode', 'solar', vscode.ConfigurationTarget.Global);
+  if (!value) return null;
+  return parseCoords(value).map(n => Math.round(n * 100) / 100);
+}
+
+/** Pick a city (offline list) or type coordinates; switches to solar mode and repaints right away. */
+async function setLocation() {
+  const custom = { label: '$(edit) Enter custom coordinates (latitude, longitude)...', alwaysShow: true, custom: true };
+  const items = [
+    custom,
+    { label: 'Major cities', kind: vscode.QuickPickItemKind.Separator },
+    ...cities().map(city => ({
+      label: city.name,
+      description: `${city.country} · (${city.lat}, ${city.lon})`,
+      city
+    }))
+  ];
+  const choice = await vscode.window.showQuickPick(items, {
+    title: 'Skymood: set location',
+    placeHolder: 'Pick your city, or enter coordinates. Used offline only, for sunrise and sunset.',
+    matchOnDescription: true
+  });
+  if (!choice) return;
+  let lat, lon, name = '';
+  if (choice.custom) {
+    const xy = await askCoordinates();
+    if (!xy) return;
+    [lat, lon] = xy;
+  } else {
+    ({ lat, lon, name } = choice.city);
+  }
+  const c = cfg();
+  const G = vscode.ConfigurationTarget.Global;
+  await c.update('latitude', lat, G);
+  await c.update('longitude', lon, G);
+  await c.update('cityName', name, G);
+  await c.update('mode', 'solar', G);
+  await render();
+  scheduleLoop();
   const sun = getSunTimes();
-  vscode.window.showInformationMessage(`Skymood: following the sun. Today: sunrise ${formatClock(sun.sunrise)}, sunset ${formatClock(sun.sunset)}.`);
+  vscode.window.showInformationMessage(`Skymood: following the sun${name ? ` in ${name}` : ''}. Today: sunrise ${formatClock(sun.sunrise)}, sunset ${formatClock(sun.sunset)}.`);
+}
+
+async function selectAtmosphere() {
+  const current = cfg().get('atmosphere', 'clear');
+  const items = CE.ATMOSPHERE_NAMES.map(name => ({
+    label: `${name === current ? '$(check) ' : ''}${CE.ATMOSPHERES[name].label}`,
+    description: CE.ATMOSPHERES[name].description,
+    value: name
+  }));
+  const choice = await vscode.window.showQuickPick(items, { title: 'Skymood: atmosphere', placeHolder: 'Pick a mood to layer over the sky' });
+  if (choice) await cfg().update('atmosphere', choice.value, vscode.ConfigurationTarget.Global);
+}
+
+function cardInfo() {
+  const info = computeState(nowMinutes());
+  const s = Sync.stats(extContext);
+  return {
+    phase: info.state.dominant, pinned: info.pinned !== 'auto', source: info.sun.source,
+    cityName: cfg().get('cityName', ''), atmosphere: info.atmosphere, variant: info.variant, moon: info.moon,
+    longestFlowMinutes: Math.max(s.longestFlowMinutes, flowMinutes()), palette: info.palette
+  };
 }
 
 async function togglePlayful() {
@@ -535,22 +631,48 @@ async function removeOverrides() {
   vscode.window.showInformationMessage('Skymood: adaptive color overrides removed from your settings.');
 }
 
+/** Status bar menu: live status in the placeholder, one-click actions in groups. */
 async function menu() {
+  const info = computeState(nowMinutes());
   const playful = cfg().get('playful.enabled', true);
   const mode = appearance();
+  const sep = label => ({ label, kind: vscode.QuickPickItemKind.Separator });
+  const cmd = (label, command, extra = {}) => ({ label, run: () => vscode.commands.executeCommand(command, ...(extra.args || [])), ...extra });
+  const mark = on => (on ? '$(check) ' : '');
+
+  const status = [LABELS[info.state.dominant], CE.ATMOSPHERES[info.atmosphere].label, `${info.moon.emoji} ${info.moon.name}`];
+  if (info.fx.flow > 0) status.push(`🔥 ${Math.floor(flowMinutes())}m`);
+
   const items = [
-    { label: '$(play) Preview a full day', cmd: 'skymood.previewCycle' },
-    { label: '$(pinned) Pin a phase / follow the sun', cmd: 'skymood.pickPhase' },
-    { label: '$(location) Set location (sunrise & sunset)', cmd: 'skymood.setLocation' },
-    { label: `$(sparkle) Playful effects: ${playful ? 'on' : 'off'}`, description: 'Flow glow, bug mood, error pulse, golden hour, moon', cmd: 'skymood.togglePlayful' },
-    { label: '$(pass-filled) Celebrate!', description: 'Just because', cmd: 'skymood.celebrate' },
-    { label: `$(color-mode) Appearance: ${MODE_LABELS[mode]}`, description: 'Dark, light or system default', cmd: 'skymood.pickAppearance' },
-    { label: '$(paintcan) Switch to Skymood Adaptive', cmd: 'skymood.enable' },
-    { label: '$(gear) Settings', cmd: 'workbench.action.openSettings', args: ['skymood'] },
-    { label: '$(trash) Remove adaptive overrides', cmd: 'skymood.removeOverrides' }
+    sep('Appearance'),
+    ...MODES.map(m => ({
+      label: `$(color-mode) ${mark(mode === m)}Appearance: ${MODE_LABELS[m].replace(' default', '')}`,
+      run: () => setAppearance(m)
+    })),
+    sep('Atmosphere'),
+    ...CE.ATMOSPHERE_NAMES.map(a => ({
+      label: `$(cloud) ${mark(info.atmosphere === a)}Atmosphere: ${CE.ATMOSPHERES[a].label}`,
+      run: () => cfg().update('atmosphere', a, vscode.ConfigurationTarget.Global)
+    })),
+    sep('Time & place'),
+    cmd('$(pin) Pin Phase / Follow the Sun', 'skymood.pickPhase',
+      { description: info.pinned !== 'auto' ? `Pinned to ${LABELS[info.pinned]}` : 'Following the sun' }),
+    cmd('$(location) Set Location (City or Coordinates)', 'skymood.setLocation',
+      { description: cfg().get('cityName', '') || undefined }),
+    cmd('$(play) Preview a Full Day (7s)', 'skymood.previewCycle'),
+    sep('Playful'),
+    cmd(`$(sparkle) Toggle Playful Effects`, 'skymood.togglePlayful', { description: playful ? 'On' : 'Off' }),
+    cmd('$(flame) Celebrate!', 'skymood.celebrate'),
+    sep('Share & sync'),
+    cmd('$(clippy) Copy Setup Card (Share Your Sky)', 'skymood.copySetupCard'),
+    cmd('$(sync) Configure Settings Sync for Multi-Machine', 'skymood.configureSync'),
+    sep('More'),
+    cmd('$(paintcan) Switch to Skymood Adaptive', 'skymood.enable'),
+    cmd('$(gear) Settings', 'workbench.action.openSettings', { args: ['skymood'] }),
+    cmd('$(trash) Remove adaptive overrides', 'skymood.removeOverrides')
   ];
-  const choice = await vscode.window.showQuickPick(items, { placeHolder: 'Skymood' });
-  if (choice) vscode.commands.executeCommand(choice.cmd, ...(choice.args || []));
+  const choice = await vscode.window.showQuickPick(items, { title: 'Skymood', placeHolder: status.join(' · ') });
+  if (choice && choice.run) await choice.run();
 }
 
 /** Removes color overrides left behind by the pre-release name ("Circadia"). */
@@ -570,6 +692,7 @@ async function cleanupLegacy() {
 // ---------------- lifecycle ----------------
 
 function activate(context) {
+  extContext = context;
   statusItem = vscode.window.createStatusBarItem('skymood.status', vscode.StatusBarAlignment.Right, 100);
   statusItem.name = 'Skymood';
   statusItem.command = 'skymood.menu';
@@ -585,6 +708,9 @@ function activate(context) {
   reg('skymood.celebrate', celebrate);
   reg('skymood.removeOverrides', removeOverrides);
   reg('skymood.menu', menu);
+  reg('skymood.selectAtmosphere', selectAtmosphere);
+  reg('skymood.copySetupCard', () => Sync.copySetupCard(vscode, cardInfo()));
+  reg('skymood.configureSync', () => Sync.configureSync(vscode));
 
   cleanupLegacy();
   const scan = scanErrors();
@@ -601,6 +727,7 @@ function activate(context) {
     vscode.workspace.onDidChangeConfiguration(e => {
       if (e.affectsConfiguration('skymood.appearance')) applyAppearance();
       if (e.affectsConfiguration('window.autoDetectColorScheme')) syncAppearance();
+      if (e.affectsConfiguration('workbench.colorCustomizations')) checkForeignOverwrite();
       if (WATCHED_SETTINGS.some(s => e.affectsConfiguration(s))) render().then(scheduleLoop);
     }),
     // Fires once the new theme is on screen (the setting can land before the theme does) and when

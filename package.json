@@ -2,7 +2,7 @@
   "name": "skymood-theme",
   "displayName": "Skymood — Adaptive Day/Night Theme",
   "description": "A living color theme, in dark and light, that shifts with your day, plus playful touches: a glow when you are in the flow, a soft red pulse when new errors appear, confetti when your errors hit zero, golden hour at sunset and the moon phase at night.",
-  "version": "1.2.0",
+  "version": "2.0.0",
   "publisher": "mvnandhakumar",
   "author": {
     "name": "Nandha Kumar"
@@ -48,7 +48,10 @@
     "golden hour",
     "fun",
     "confetti",
-    "errors"
+    "errors",
+    "atmosphere",
+    "settings sync",
+    "city"
   ],
   "main": "./extension.js",
   "extensionKind": [
@@ -151,6 +154,21 @@
         "command": "skymood.menu",
         "title": "Open Menu",
         "category": "Skymood"
+      },
+      {
+        "command": "skymood.selectAtmosphere",
+        "title": "Select Atmosphere Profile",
+        "category": "Skymood"
+      },
+      {
+        "command": "skymood.copySetupCard",
+        "title": "Copy Setup Card (Share Your Sky)",
+        "category": "Skymood"
+      },
+      {
+        "command": "skymood.configureSync",
+        "title": "Configure Settings Sync for Multi-Machine",
+        "category": "Skymood"
       }
     ],
     "configuration": {
@@ -222,12 +240,40 @@
           "maximum": 180,
           "description": "Longitude for solar mode. Stays on your machine."
         },
+        "skymood.cityName": {
+          "type": "string",
+          "default": "",
+          "description": "Optional display label for your configured solar location."
+        },
         "skymood.nightWarmth": {
           "type": "number",
           "default": 0.4,
           "minimum": 0,
           "maximum": 1,
           "description": "How much blue light to remove at night (0 = none, 1 = strongest)."
+        },
+        "skymood.atmosphere": {
+          "type": "string",
+          "enum": [
+            "clear",
+            "overcast",
+            "arctic",
+            "amber"
+          ],
+          "enumItemLabels": [
+            "Clear",
+            "Overcast",
+            "Arctic",
+            "Amber"
+          ],
+          "enumDescriptions": [
+            "Clear: the crisp solar palette (default).",
+            "Overcast: monsoon and rainy-day mood. About 28% less chroma, cool slate neutrals and softer contrast spikes.",
+            "Arctic: crisp, high-clarity ice tones with a 215° hue bias and extended twilight transitions.",
+            "Amber: deep warm comfort mode with a 55° hue bias and strong blue-light attenuation at every hour."
+          ],
+          "default": "clear",
+          "description": "A mood layered over the four solar phases, in both dark and light. Code text always stays at WCAG AA contrast."
         },
         "skymood.pinnedPhase": {
           "type": "string",
@@ -298,6 +344,7 @@
   },
   "scripts": {
     "build:themes": "node scripts/build-themes.js",
+    "test": "node test/verify.js",
     "vscode:prepublish": "node scripts/build-themes.js",
     "package": "npx @vscode/vsce package",
     "publish": "npx @vscode/vsce publish"

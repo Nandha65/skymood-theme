@@ -11,6 +11,11 @@ It also notices you: it glows when you're in the flow, breathes a soft red when 
 
 ![Skymood shifting through a full day](images/day-cycle.gif)
 
+[![VS Code Marketplace](https://img.shields.io/visual-studio-marketplace/v/mvnandhakumar.skymood-theme?label=VS%20Code%20Marketplace&color=5cc8ff)](https://marketplace.visualstudio.com/items?itemName=mvnandhakumar.skymood-theme)
+[![GitHub Stars](https://img.shields.io/github/stars/Nandha65/skymood-theme?style=flat&logo=github&color=f0a35e)](https://github.com/Nandha65/skymood-theme)
+[![Discord](https://img.shields.io/badge/Discord-join%20the%20chat-5865F2?logo=discord&logoColor=white)](https://discord.gg/2jrg7VyS3)
+[![Sponsor](https://img.shields.io/badge/Sponsor-%E2%9D%A4-ea4aaa?logo=githubsponsors&logoColor=white)](https://github.com/sponsors/Nandha65)
+
 </div>
 
 ---
@@ -24,6 +29,23 @@ It also notices you: it glows when you're in the flow, breathes a soft red when 
 | ☀️ **Follows your real sun** | Enter your city's coordinates once. Skymood calculates sunrise and sunset for every day of the year, **offline**. |
 | 😌 **Easy on the eyes at night** | Night warmth gently cuts blue light after dark. You choose how strong. |
 | 👓 **Readable at every hour** | Every blend is contrast-checked: code text stays at or above WCAG AA, all day. |
+
+## 🌦️ Atmosphere profiles (new in 2.0)
+
+Layer a mood over the four solar phases, in both dark and light. Pick one from the status bar menu, **Skymood: Select Atmosphere Profile**, or `skymood.atmosphere`.
+
+| Atmosphere | What it does |
+|---|---|
+| **Clear** (default) | The crisp solar palette. |
+| **Overcast** | Monsoon and rainy days: about 28% less chroma, cool slate neutrals (235°) and softer contrast for long, grey sessions. |
+| **Arctic** | Crisp ice tones (215° hue bias) with longer twilight transitions. |
+| **Amber** | Deep warm comfort mode (55° hue bias) with strong blue-light attenuation at every hour. |
+
+Colors are blended in a perceptual color space (OKLab/OKLCH), and a contrast clamp runs **last**, after the atmosphere, night warmth and every playful tint, so code text stays at or above WCAG AA (4.5:1, comments 3:1) in all four atmospheres, all day. `npm test` checks every minute of the day.
+
+## 📍 City picker
+
+**Skymood: Set Location for Sunrise & Sunset** opens a list of 350 major cities, or lets you type coordinates (`12.97, 77.59`). Pick one and Skymood sets your latitude, longitude and city, switches to solar mode and repaints right away. The list ships inside the extension. Nothing is looked up online.
 
 ## 🎮 Playful touches
 
@@ -50,7 +72,10 @@ Every effect can be switched off on its own, or all at once with **Skymood: Togg
 | Skymood: Turn On Adaptive Theme | Activates Skymood, in the mode set by `skymood.appearance` |
 | Skymood: Preview a Full Day | Animates the full 24-hour cycle |
 | Skymood: Pin a Phase / Follow the Sun | Locks one palette, or returns to automatic |
-| Skymood: Set Location for Sunrise & Sunset | Switches to real solar times |
+| Skymood: Set Location for Sunrise & Sunset | Pick a city or enter coordinates; switches to real solar times |
+| Skymood: Select Atmosphere Profile | Clear, Overcast, Arctic or Amber |
+| Skymood: Copy Setup Card (Share Your Sky) | Copies a Markdown card of your phase, atmosphere, moon and flow streak; can save it as a 600×240 SVG |
+| Skymood: Configure Settings Sync for Multi-Machine | Keeps Skymood's colors per machine, in one click |
 | Skymood: Toggle Playful Effects | All playful effects on or off |
 | Skymood: Celebrate! | Because you deserve it |
 | Skymood: Remove Adaptive Overrides from Settings | Cleans up everything Skymood wrote |
@@ -65,6 +90,8 @@ Or just click the Skymood item in the status bar, which is also where you switch
 | `skymood.mode` | `clock` | `clock` uses fixed times, `solar` uses your location |
 | `skymood.sunrise` / `skymood.sunset` | `06:30` / `18:30` | Times used in clock mode |
 | `skymood.latitude` / `skymood.longitude` | — | Your location for solar mode |
+| `skymood.cityName` | — | Label for your location (set by the city picker) |
+| `skymood.atmosphere` | `clear` | `clear`, `overcast`, `arctic` or `amber` |
 | `skymood.nightWarmth` | `0.4` | Blue-light reduction at night (0–1) |
 | `skymood.pinnedPhase` | `auto` | `auto`, `night`, `dawn`, `day` or `dusk` |
 | `skymood.playful.enabled` | `true` | Master switch for playful effects |
@@ -89,22 +116,35 @@ Prefer a fixed look? These are included as regular themes:
 
 Everything runs locally: no network calls and no telemetry, and your location stays on your machine. Skymood writes its colors into `workbench.colorCustomizations` and `editor.tokenColorCustomizations`, **scoped to `[Skymood Adaptive]` and `[Skymood Adaptive Light]` only**, so your other themes and your own tweaks are untouched. With several windows open, the one you're working in sets the colors.
 
-**Settings Sync on several machines?** Those two settings sync like any other, so machines in different timezones would keep repainting each other. To keep Skymood's colors per machine, add this to your user settings. Note that it also stops syncing any color customizations of your own.
+**Settings Sync on several machines?** Those two settings sync like any other, so machines in different timezones would keep repainting each other. Run **Skymood: Configure Settings Sync for Multi-Machine** and Skymood adds both to `settingsSync.ignoredSettings` for you, keeping every entry you already had. If it notices another machine or window repeatedly rewriting its colors, it offers the same tip once. Note that this also stops syncing any color customizations of your own.
 
-```json
-"settingsSync.ignoredSettings": ["workbench.colorCustomizations", "editor.tokenColorCustomizations"]
-```
+The setup card shares only what you copy or save, and the counts behind the one-time thank-you (celebrations and time in flow) never leave your machine. Skymood never records what you type.
 
 ## 💬 Community
 
 Questions, ideas, or a screenshot of your setup at golden hour? Join the [Skymood Discord](https://discord.gg/2jrg7VyS3). Found a bug? [Open an issue](https://github.com/Nandha65/skymood-theme/issues).
 
-## 🧰 Production starter kits
+## 🆚 Skymood Core and Skymood Studio
 
-Building a commercial product? **[PlanForge](https://planforge.web.app)** is a TypeScript engine for spatial layout editors and interactive grid planners: drag-and-drop layouts, live pricing and print-ready PDF export. [Try the live demo](https://planforge.web.app), then [get the source code](https://nandha4.gumroad.com/l/planforge) ($49 one-time) or [sponsor on GitHub](https://github.com/sponsors/Nandha65) ($29/month) for repo access and every update.
+| | **Skymood Core** (free, MIT) | **Skymood Studio** ([$5/month sponsors](https://github.com/sponsors/Nandha65) or [$12 once on Gumroad](https://techrefiner.gumroad.com/l/skymood-studio)) |
+|---|---|---|
+| VS Code adaptive engine, dark and light | ✅ | ✅ |
+| Real solar and lunar astronomy, offline | ✅ | ✅ |
+| 4 atmospheres and city picker | ✅ | ✅ |
+| Playful effects and setup card | ✅ | ✅ |
+| 4K and 5K dynamic wallpapers, with a Windows and macOS background switcher | | ✅ |
+| 7 terminal and shell ports: Windows Terminal, iTerm2, Ghostty, Warp, Alacritty, WezTerm, Starship | | ✅ |
+| Custom accent generator: your brand color to a VS Code, terminal and wallpaper bundle | | ✅ |
+| Private repo access and a Discord Supporter role | | ✅ |
 
 ## ❤️ Support
 
-If Skymood makes your late-night coding a little kinder on the eyes, [sponsor the project](https://github.com/sponsors/Nandha65) or leave a ⭐ on [GitHub](https://github.com/Nandha65/skymood-theme).
+Skymood is free, MIT-licensed and built in the open. If it makes your late-night coding a little kinder on the eyes:
+
+- [**Sponsor the project**](https://github.com/sponsors/Nandha65) to keep it maintained
+- Leave a ⭐ on [GitHub](https://github.com/Nandha65/skymood-theme)
+- Share your sky with **Skymood: Copy Setup Card**
+
+<sub>More tools by Nandha Kumar: [PlanForge](https://planforge.web.app), a TypeScript engine for spatial layout editors and grid planners.</sub>
 
 <sub>MIT License · Made by Nandha Kumar</sub>

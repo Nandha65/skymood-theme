@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.0.1
+- The celebration badge is smaller (18px text, tighter padding), so it sits better in narrow editors.
+- README: the Studio comparison table no longer mentions a Discord role.
+
 ## 2.0.0
 - 🌦️ **Atmosphere profiles**: Clear (default), Overcast, Arctic and Amber, layered over the four solar phases in dark and light. New setting `skymood.atmosphere` and command **Select Atmosphere Profile**.
 - 📍 **City picker**: **Set Location** now lists 350 major cities (offline), or accepts coordinates as before. Picking a city sets latitude, longitude and the new `skymood.cityName`, switches to solar mode and repaints right away.

@@ -276,9 +276,9 @@ test('extension.js loads and exports activate/deactivate', () => {
     Module._load = load;
   }
 });
-test('package.json: version 2.0.0, every command is registered, no runtime dependencies', () => {
+test('package.json: version 2.0.x, every command is registered, no runtime dependencies', () => {
   const pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
-  assert.strictEqual(pkg.version, '2.0.0');
+  assert.ok(/^2\.0\.\d+$/.test(pkg.version), pkg.version);
   assert.strictEqual(pkg.publisher, 'mvnandhakumar');
   assert.strictEqual(pkg.main, './extension.js');
   assert.ok(!pkg.dependencies, 'no dependencies allowed');

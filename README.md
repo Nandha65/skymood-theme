@@ -135,7 +135,7 @@ Questions, ideas, or a screenshot of your setup at golden hour? Join the [Skymoo
 | 4K and 5K dynamic wallpapers, with a Windows and macOS background switcher | | ✅ |
 | 7 terminal and shell ports: Windows Terminal, iTerm2, Ghostty, Warp, Alacritty, WezTerm, Starship | | ✅ |
 | Custom accent generator: your brand color to a VS Code, terminal and wallpaper bundle | | ✅ |
-| Private repo access and a Discord Supporter role | | ✅ |
+| Private repo access, with every update | | ✅ |
 
 ## ❤️ Support
 
